@@ -2,9 +2,8 @@
   "name": "checkphish-slack-app",
   "description": "Simple Slack App for integrating the CheckPhish API with Slack using Google App Engine.",
   "version": "0.0.1",
-  "private": true,
-  "license": "UNLICENSED",
-  "author": "timjohns@yahoo.com",
+  "license": "MIT",
+  "author": "timothy.a.johns@gmail.com",
   "engines": {
     "node": ">=8.0.0"
   },
