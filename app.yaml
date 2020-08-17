@@ -1,6 +1,7 @@
 runtime: nodejs10
 env_variables:
-  SLACK_CLIENT_ID: "1292790603059.1277849907015"
+# Get your SLACK_CLIENT_ID value from your Slack App's App Credentials 'Client ID' value
+  SLACK_CLIENT_ID: <Slack App Client ID>
 handlers:
   - url: /.*
     secure: always
