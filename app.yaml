@@ -1,0 +1,7 @@
+runtime: nodejs10
+env_variables:
+  SLACK_CLIENT_ID: "1292790603059.1277849907015"
+handlers:
+  - url: /.*
+    secure: always
+    script: auto
