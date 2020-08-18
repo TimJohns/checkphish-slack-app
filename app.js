@@ -69,8 +69,6 @@ app.post('/', async (req, res, next) => {
 
   try {
 
-    console.log(JSON.stringify({body: req.body}));
-
     // Validate signature
     const signature = {
       signingSecret: await getSlackSigningSecret(),
@@ -89,8 +87,6 @@ app.post('/', async (req, res, next) => {
       res.status(200).send('Missing URL.');
     } else {
 
-      // TODO(tjohns): Add an easter egg (i.e. if someone tries to check checkphish.ai, respond with "Are you kidding me?")
-      // TODO(tjohns): Pick/Strip relevant fields
       const message = {
         url: url,
         response_url: req.body.response_url
@@ -118,9 +114,24 @@ app.post('/', async (req, res, next) => {
   }
 });
 
-app.get('/slackappinstall', async (req, res, nex) => {
+app.get('/slackappinstall', async (req, res, next) => {
   try {
-    res.redirect(`https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=commands&user_scope=`);
+    // TODO(tjohns): Generate CSRF/OTP Session Token (nonce + timestamp + random)
+    res.render('install');
+  } catch(error) {
+    next(error);
+  }
+})
+
+app.post('/slackappinstall', async (req, res, next) => {
+  try {
+    let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=commands&user_scope=`;
+    if (req.body.apikey) {
+      // TODO(tjohns): Verify CSRF token
+      // TODO(tjohns): Encrypt provided API key using a secret stored in the Secret manager
+      // TODO(tjohns): Include state=<encrypted value> on destUrl
+    }
+    res.redirect(destUrl);
 
   } catch(error) {
     next(error);
@@ -170,6 +181,10 @@ app.get('/auth', async (req, res, next) => {
       })
     });
 
+    // TODO(tjohns): If 'ok':
+    // Get the state token
+    // Create a key-value store with the exchangeResponse.data.app_id (our App ID) and exchangeResponse.data.team.id (the workspace Id)
+    // Store the state token (i.e. encrypted API key)
     let team = "Team";
     if (exchangeResponse
       && exchangeResponse.data
