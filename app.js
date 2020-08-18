@@ -1,5 +1,3 @@
-// TODO(tjohns): Allow multiple URLs on one line
-// TODO(tjohns): Allow installers to specify their own API key
 'use strict';
 
 const express = require('express');
@@ -11,7 +9,6 @@ const {GoogleAuth} = require('google-auth-library');
 const axios = require('axios');
 const qs = require('qs');
 
-// TODO(tjohns) cache these for further use
 const pubSubClient = new PubSub();
 const secretManagerServiceClient = new SecretManagerServiceClient();
 const auth = new GoogleAuth();
@@ -86,9 +83,6 @@ app.post('/', async (req, res, next) => {
       throw Error('Incorrect signature.');
     }
 
-    // TODO(tjohns): Read best practices
-
-    // TODO(tjohns): Validate URL
     const url = (req.body.text || "");
 
     if (url.length < 1) {
