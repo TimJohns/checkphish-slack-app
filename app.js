@@ -100,7 +100,8 @@ app.post('/', async (req, res, next) => {
       await pubSubClient.topic('scan').publish(dataBuffer);
       res.status(200).json({
         response_type: 'ephemeral',
-         blocks: [
+        text: `Scanning ${url}...`,
+        blocks: [
           {
             "type": "section",
             "text": {
