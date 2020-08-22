@@ -32,22 +32,25 @@ TODO(tjohns): GIF/Video
 
 
 ### Secrets and Client ID Configuration
-1. Find the "App Credentials" under the "Basic Information" settings for your Slack command TODO(tjohns): Better GIF or Video
-2. Copy the Client ID into your app.yaml file where indicated.
-3. In your Google Cloud Project, select 'Security'->'Secret Manager'
-4. Enable the Secret Manager API by clicking 'Enable' if it is not already enabled. Note: You may wish to review pricing.
-5. Click 'CREATE SECRET' to create the first of three secrets used by the App.
-6. Name the first secret 'slack_client_secret', and copy the value from your Slack App Client Secret.
-7. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
-8. Return to the Secret Manager parent page. TODO(tjohns): GIF or video
-9. Click 'CREATE SECRET' to create the second secret.
-10. Name the second secret 'slack_signing_secret', and copy the value from your Slack App Signing Secret.
-11. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
-12. Return to the Secret Manager parent page. TODO(tjohns): GIF or video
-13. Click 'CREATE SECRET' to create the third secret.
-14. Name the third secret 'checkphish_api_key', and copy the value from your CheckPhish API configuration.
-15. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
-16. Redeploy your App Engine project with the updated YAML TODO(tjohns): Is there a convenient way to update the environment variable without redeploying?
+1. Generate an initialization vector (random data) for the state token encryption  TODO(tjohns): Indicate encoding and length
+2. Copy the IV into the app.yaml file's CIPHER_IV value
+3. Enter the IV into the Environment Variables for the Google Cloud Function
+4. Find the "App Credentials" under the "Basic Information" settings for your Slack command TODO(tjohns): Better GIF or Video
+5. Copy the Client ID into your app.yaml file where indicated.
+6. In your Google Cloud Project, select 'Security'->'Secret Manager'
+7. Enable the Secret Manager API by clicking 'Enable' if it is not already enabled. Note: You may wish to review pricing.
+8. Click 'CREATE SECRET' to create the first of three secrets used by the App.
+9. Name the first secret 'slack_client_secret', and copy the value from your Slack App Client Secret.
+10. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
+11. Return to the Secret Manager parent page. TODO(tjohns): GIF or video
+12. Click 'CREATE SECRET' to create the second secret.
+13. Name the second secret 'slack_signing_secret', and copy the value from your Slack App Signing Secret.
+14. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
+15. Return to the Secret Manager parent page. TODO(tjohns): GIF or video
+16. Click 'CREATE SECRET' to create the third secret.
+17. Name the third secret 'checkphish_api_key', and copy the value from your CheckPhish API configuration.
+18. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
+19. Redeploy your App Engine project with the updated YAML TODO(tjohns): Is there a convenient way to update the environment variable without redeploying?
 
 ### Deploy the Google Cloud Function
 1. From the Cloud Functions screen in your project in the Google Cloud Console, choose 'CREATE FUNCTION' TODO(tjohns): GIF or video. And/or command line.

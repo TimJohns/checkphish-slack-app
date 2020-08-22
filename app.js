@@ -8,47 +8,49 @@ const {verifyRequestSignature} = require('@slack/events-api');
 const {GoogleAuth} = require('google-auth-library');
 const axios = require('axios');
 const qs = require('qs');
+const crypto = require('crypto');
+const {Datastore} = require('@google-cloud/datastore');
 
 const pubSubClient = new PubSub();
 const secretManagerServiceClient = new SecretManagerServiceClient();
 const auth = new GoogleAuth();
+const datastore = new Datastore();
 
-let gSlackSigningSecret;
-async function getSlackSigningSecret() {
+const secrets = new Map();
+async function getSecret(secretName) {
+  let secret = secrets.get(secretName);
 
-  if (!gSlackSigningSecret) {
-
-    console.log('No cached slack signing secret, fetching secret from secret manager');
+  if (!secret) {
+    console.log(`No cached secret found, fetching ${secretName} from secret manager`);
 
     const projectId = await auth.getProjectId();
 
-    // Access the secret.
     const [accessResponse] = await secretManagerServiceClient.accessSecretVersion({
-      name: `projects/${projectId}/secrets/slack_signing_secret/versions/latest`,
+      name: `projects/${projectId}/secrets/${secretName}/versions/latest`,
     });
 
-    gSlackSigningSecret = accessResponse.payload.data.toString('utf8');
+    secret = accessResponse.payload.data.toString('utf8')
+    secrets.set(secretName, secret);
   }
-  return gSlackSigningSecret;
+  return secret;
+}
+
+async function createCipher() {
+
+  const key = await getSecret('cipher_key');
+  const algorithm = 'aes-256-cbc';
+  const iv = process.env.CIPHER_IV;
+
+  return crypto.createCipheriv(algorithm, key, iv);
 };
 
-let gSlackClientSecret;
-async function getSlackClientSecret() {
+async function createDecipher() {
 
-  if (!gSlackClientSecret) {
+  const key = await getSecret('cipher_key');
+  const algorithm = 'aes-256-cbc';
+  const iv = process.env.CIPHER_IV;
 
-    console.log('No cached client secret, fetching secret from secret manager');
-
-    const projectId = await auth.getProjectId();
-
-    // Access the secret.
-    const [accessResponse] = await secretManagerServiceClient.accessSecretVersion({
-      name: `projects/${projectId}/secrets/slack_client_secret/versions/latest`,
-    });
-
-    gSlackClientSecret = accessResponse.payload.data.toString('utf8');
-  }
-  return gSlackClientSecret;
+  return crypto.createDecipheriv(algorithm, key, iv);
 };
 
 const app = express();
@@ -71,7 +73,7 @@ app.post('/', async (req, res, next) => {
 
     // Validate signature
     const signature = {
-      signingSecret: await getSlackSigningSecret(),
+      signingSecret: await getSecret('slack_signing_secret'),
       requestSignature: req.headers['x-slack-signature'],
       requestTimestamp: req.headers['x-slack-request-timestamp'],
       body: req.rawBody,
@@ -88,7 +90,8 @@ app.post('/', async (req, res, next) => {
     } else {
 
       const message = {
-        url: url,
+        url,
+        team_id: req.body.team_id,
         response_url: req.body.response_url
       };
 
@@ -125,12 +128,32 @@ app.get('/slackappinstall', async (req, res, next) => {
 })
 
 app.post('/slackappinstall', async (req, res, next) => {
+
   try {
     let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=commands&user_scope=`;
-    if (req.body.apikey) {
-      // TODO(tjohns): Verify CSRF token
-      // TODO(tjohns): Encrypt provided API key using a secret stored in the Secret manager
-      // TODO(tjohns): Include state=<encrypted value> on destUrl
+    if (req.body.apiKey) {
+
+      // TODO(tjohns): Verify CSRF token (I'm not sure this is strictly necessary, since the
+      // apiKey is, in effect, a form of identity token, but I'm 100% certain if I DON'T
+      // use a CSRF token, I'll have to explain that, since it's standard practice - and
+      // of course I might be wrong!)
+
+      // TODO(tjohns): Make a trial request with the API key to verify it's valid (at that one
+      // moment, anyway)
+
+      const stateToken = {
+        apiKey: req.body.apiKey
+      };
+
+
+      // Encrypt the state token
+      const cipher = await createCipher();
+
+      const stateTokenStr = JSON.stringify(stateToken);
+      const encryptedStateToken = cipher.update(stateTokenStr, 'utf8', 'base64') + cipher.final('base64');
+
+      destUrl += "&state=" + encodeURIComponent(encryptedStateToken);
+
     }
     res.redirect(destUrl);
 
@@ -166,8 +189,13 @@ app.get('/auth', async (req, res, next) => {
       return;
     }
 
-    const userPass = `${process.env.SLACK_CLIENT_ID}:${await getSlackClientSecret()}`;
+    const userPass = `${process.env.SLACK_CLIENT_ID}:${await getSecret('slack_client_secret')}`;
     const basicCredentials = Buffer.from(userPass).toString('base64');
+    // TODO(tjohns): Verify something here (in addition to just saving off the API Key)
+    const decipher = await createDecipher();
+    const stateTokenStr = decipher.update(req.query.state, 'base64', 'utf8') + decipher.final('utf8');
+
+    let stateToken = JSON.parse(stateTokenStr);
 
     const exchangeResponse = await axios(
       {
@@ -182,19 +210,34 @@ app.get('/auth', async (req, res, next) => {
       })
     });
 
-    // TODO(tjohns): If 'ok':
-    // Get the state token
-    // Create a key-value store with the exchangeResponse.data.app_id (our App ID) and exchangeResponse.data.team.id (the workspace Id)
-    // Store the state token (i.e. encrypted API key)
-    let team = "Team";
+    // TODO(tjohns): Validate response; If not 'ok', return a more meaningful error
+
+    const teamKey = datastore.key(["SlackTeam", exchangeResponse.data.team.id]);
+
+    // re-encrypt the API key
+    const cipher = await createCipher();
+    let encryptedAPIKey = cipher.update(stateToken.apiKey, 'base64', 'base64') + cipher.final('base64');
+
+    const team = {
+      key: teamKey,
+      data: {
+        team: exchangeResponse.data.team,
+        apiKey: encryptedAPIKey
+      },
+    };
+
+    // Save the team info (including the API Key for the team)
+    await datastore.save(team);
+
+    let teamName = "Team";
     if (exchangeResponse
       && exchangeResponse.data
       && exchangeResponse.data.team
       && exchangeResponse.data.team.name) {
-          team = exchangeResponse.data.team.name;
+        teamName = exchangeResponse.data.team.name;
       }
 
-    res.redirect(`/authsuccess?${qs.stringify({team})}`);
+    res.redirect(`/authsuccess?${qs.stringify({teamName})}`);
 
   } catch(error) {
     next(error);
@@ -203,7 +246,7 @@ app.get('/auth', async (req, res, next) => {
 
 app.get('/authsuccess', async (req, res, next) => {
   try {
-    res.render('authsuccess', {team: req.query.team || "Unknown Team"});
+    res.render('authsuccess', {team: req.query.teamName || "Unknown Team"});
   } catch(error) {
     next(error);
   }
