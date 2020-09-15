@@ -3,9 +3,9 @@
 import { default as express, Request, Response } from "express";
 import path from "path";
 
-const {PubSub} = require('@google-cloud/pubsub');
-const bodyParser = require('body-parser');
-const {SecretManagerServiceClient} = require('@google-cloud/secret-manager');
+import {PubSub} from "@google-cloud/pubsub";
+import bodyParser from "body-parser";
+import {SecretManagerServiceClient} from "@google-cloud/secret-manager";
 const {verifyRequestSignature} = require('@slack/events-api');
 const {GoogleAuth} = require('google-auth-library');
 const axios = require('axios');
@@ -31,7 +31,7 @@ async function getSecret(secretName: string) {
       name: `projects/${projectId}/secrets/${secretName}/versions/latest`,
     });
 
-    secret = accessResponse.payload.data.toString('utf8')
+    secret = accessResponse.payload.data.toString()
     secrets.set(secretName, secret);
   }
   return secret;
