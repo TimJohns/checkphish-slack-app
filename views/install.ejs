@@ -11,12 +11,36 @@
     <title>CheckPhish Slack App Install</title>
   </head>
   <body>
-    <h1>Installation</h1>
+    <div class="container">
+      <h1>Installation</h1>
 
-    <!-- Optional JavaScript -->
-    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+      <p>If you provide an optional CheckPhish API key, the summaries of API usage will be shown in the associated dashboard, and requests made will be limited by your own quota rather than a shared quota.</p>
+      <p>If you don't provide a key, the Slack App will function, but the quota is shared among others in the community who also did not provide an API key, and you won't be able to see usage stats in your dashboard.</p>
+      <p>If you change your mind later, you can reinstall the CheckPhish Slack App.</p>
+
+      <form method="post">
+        <div class="form-group">
+          <label for="apikey">CheckPhish API Key</label>
+          <input type="password" class="form-control" name="apiKey" id="apikey" placeholder="Optional">
+        </div>
+        <p>
+          <a data-toggle="collapse" href="#advanced" aria-expanded="false" aria-controls="advanced">
+            Advanced
+          </a>
+          <div class="collapse card card-body" id="advanced">
+            <p>In addition to using the API key above for you own requests, you can also optionally set it as the default for your team's workspace.</p>
+            <p>Use caution when selecting this option. If there is an existing default API for your workspace, this option will be ignored.</p>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" name="shareAPIKeyCheck" value="share" id="shareAPIKeyCheck">
+              <label class="form-check-label" for="shareAPIKeyCheck">
+                Share API Key
+              </label>
+            </div>
+          </div>
+        </p>
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </form>
+    </div>
+    <%- include ('partials/bodylast') %>
   </body>
 </html>
