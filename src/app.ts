@@ -6,12 +6,13 @@ import path from "path";
 import {PubSub} from "@google-cloud/pubsub";
 import bodyParser from "body-parser";
 import {SecretManagerServiceClient} from "@google-cloud/secret-manager";
-const {verifyRequestSignature} = require('@slack/events-api');
-const {GoogleAuth} = require('google-auth-library');
-const axios = require('axios');
-const qs = require('qs');
-const crypto = require('crypto');
-const {Datastore} = require('@google-cloud/datastore');
+import {verifyRequestSignature} from "@slack/events-api";
+import {GoogleAuth} from "google-auth-library";
+import axios from "axios";
+import qs from "qs";
+import crypto from "crypto";
+
+import {Datastore} from "@google-cloud/datastore";
 
 const pubSubClient = new PubSub();
 const secretManagerServiceClient = new SecretManagerServiceClient();
@@ -84,8 +85,8 @@ app.post('/', async (req: Request, res: Response, next) => {
     // Validate signature
     const signature = {
       signingSecret: await getSecret('slack_signing_secret'),
-      requestSignature: req.headers['x-slack-signature'],
-      requestTimestamp: req.headers['x-slack-request-timestamp'],
+      requestSignature: req.header('x-slack-signature'),
+      requestTimestamp: Number(req.header('x-slack-request-timestamp')),
       // @ts-ignore TODO(tjohns): Fix this, see above
       body: req.rawBody,
     };
@@ -194,6 +195,7 @@ app.get('/slackappsupport', async (req, res, next) => {
 })
 
 
+// TODO(tjohns): Figure out how to specify query parameter allowed values w/TypeScript
 app.get('/auth', async (req, res, next) => {
 
   try {
@@ -208,8 +210,9 @@ app.get('/auth', async (req, res, next) => {
     const basicCredentials = Buffer.from(userPass).toString('base64');
     // TODO(tjohns): Verify something here (in addition to just saving off the API Key)
     const decipher = await createDecipher();
-    const stateTokenStr = decipher.update(req.query.state, 'base64', 'utf8') + decipher.final('utf8');
+    const stateTokenStr = decipher.update(req.query.state as string, 'base64', 'utf8') + decipher.final('utf8');
 
+    // TODO(tjohns): Create a type for the StateToken
     let stateToken = JSON.parse(stateTokenStr);
 
     // TODO(tjohns): Remove this log statement
@@ -237,7 +240,7 @@ app.get('/auth', async (req, res, next) => {
 
       // re-encrypt the API key
       const cipher = await createCipher();
-      let encryptedAPIKey = cipher.update(stateToken.apiKey, 'base64', 'base64') + cipher.final('base64');
+      let encryptedAPIKey = cipher.update(stateToken.apiKey as string, 'utf8', 'base64') + cipher.final('base64');
 
       const slackUserKey = datastore.key(["SlackUser", exchangeResponse.data.authed_user.id]);
       const slackUser = {
