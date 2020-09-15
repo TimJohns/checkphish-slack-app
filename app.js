@@ -71,6 +71,10 @@ app.post('/', async (req, res, next) => {
 
   try {
 
+    // TODO(tjohns): Remove these console logs
+    console.log(JSON.stringify({headers: req.headers}));
+    console.log(JSON.stringify({scopes: req.headers['X-OAuth-Scopes']}));
+
     // Validate signature
     const signature = {
       signingSecret: await getSecret('slack_signing_secret'),
@@ -91,6 +95,7 @@ app.post('/', async (req, res, next) => {
 
       const message = {
         url,
+        user_id: req.body.user_id,
         team_id: req.body.team_id,
         response_url: req.body.response_url
       };
@@ -129,9 +134,13 @@ app.get('/slackappinstall', async (req, res, next) => {
 
 app.post('/slackappinstall', async (req, res, next) => {
 
+  // TODO(tjohns): Remove this console log
+  console.log(JSON.stringify({body: req.body}));
+
   try {
     let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=commands&user_scope=`;
-    if (req.body.apiKey) {
+    const apiKey = (req.body.apiKey || '').trim()
+    if (apiKey.length) {
 
       // TODO(tjohns): Verify CSRF token (I'm not sure this is strictly necessary, since the
       // apiKey is, in effect, a form of identity token, but I'm 100% certain if I DON'T
@@ -142,7 +151,7 @@ app.post('/slackappinstall', async (req, res, next) => {
       // moment, anyway)
 
       const stateToken = {
-        apiKey: req.body.apiKey
+        apiKey
       };
 
 
@@ -153,7 +162,6 @@ app.post('/slackappinstall', async (req, res, next) => {
       const encryptedStateToken = cipher.update(stateTokenStr, 'utf8', 'base64') + cipher.final('base64');
 
       destUrl += "&state=" + encodeURIComponent(encryptedStateToken);
-
     }
     res.redirect(destUrl);
 
@@ -197,6 +205,9 @@ app.get('/auth', async (req, res, next) => {
 
     let stateToken = JSON.parse(stateTokenStr);
 
+    // TODO(tjohns): Remove this log statement
+    console.log(stateTokenStr);
+
     const exchangeResponse = await axios(
       {
       method: 'post',
@@ -210,24 +221,34 @@ app.get('/auth', async (req, res, next) => {
       })
     });
 
-    // TODO(tjohns): Validate response; If not 'ok', return a more meaningful error
+    // TODO(tjohns) Remove this log statement.
+    console.log(JSON.stringify({exchangeResponse: exchangeResponse.data}));
 
-    const teamKey = datastore.key(["SlackTeam", exchangeResponse.data.team.id]);
+    if (stateToken.apiKey) {
 
-    // re-encrypt the API key
-    const cipher = await createCipher();
-    let encryptedAPIKey = cipher.update(stateToken.apiKey, 'base64', 'base64') + cipher.final('base64');
+      // The installer provided an API Key, so we will use it.
 
-    const team = {
-      key: teamKey,
-      data: {
-        team: exchangeResponse.data.team,
-        apiKey: encryptedAPIKey
-      },
-    };
+      // re-encrypt the API key
+      const cipher = await createCipher();
+      let encryptedAPIKey = cipher.update(stateToken.apiKey, 'base64', 'base64') + cipher.final('base64');
 
-    // Save the team info (including the API Key for the team)
-    await datastore.save(team);
+      const slackUserKey = datastore.key(["SlackUser", exchangeResponse.data.authed_user.id]);
+      const slackUser = {
+        key: slackUserKey,
+        data: {
+          user: exchangeResponse.data.authed_user,
+          apiKey: encryptedAPIKey
+        }
+      };
+      // Save the user info (including the API Key for the user)
+      const result = await datastore.save(slackUser);
+
+      // TODO(tjohns): Remove this
+      console.log(`Saved slackUser: ${JSON.stringify({slackUser})}.`);
+      console.log(`Saved slackUser result: ${JSON.stringify({result})}.`);
+
+    } // else the installer did NOT provide an API key, and will therefore remain
+      // anonymous, and we'll (ultimately) use OUR API key to make the CheckPhish requests
 
     let teamName = "Team";
     if (exchangeResponse
@@ -237,6 +258,17 @@ app.get('/auth', async (req, res, next) => {
         teamName = exchangeResponse.data.team.name;
       }
 
+    // TODO(tjohns): Provide some context on how the installation was handled;
+    // in other words, let the user know which of these scenarios they're in:
+    //   Installed with no API token specified
+    //      With the default token only
+    //      With an existing team-wide token
+    //   Installed with an individual API token specified
+    //   Installed with a team-wide API token specified
+    //      With an existing team-wide API token
+    //      With the specified token now used for tean-wide access
+    // Provide the user some instruction on how to fix what they did, if
+    // it wasn't what they intended.
     res.redirect(`/authsuccess?${qs.stringify({teamName})}`);
 
   } catch(error) {
