@@ -1,6 +1,7 @@
 'use strict';
 
 import { default as express, Request, Response } from "express";
+import path from "path";
 
 const {PubSub} = require('@google-cloud/pubsub');
 const bodyParser = require('body-parser');
@@ -69,6 +70,7 @@ function rawBodySaver (req: Request, res: Response, buf: Buffer, encoding: Buffe
 }
 
 app.use(bodyParser.urlencoded({ extended: true, verify: rawBodySaver}));
+app.set( "views", path.join( __dirname, "views" ) );
 app.set('view engine', 'ejs');
 
 app.post('/', async (req: Request, res: Response, next) => {
