@@ -1,6 +1,7 @@
 'use strict';
 
-const express = require('express');
+import { default as express, Request, Response } from "express";
+
 const {PubSub} = require('@google-cloud/pubsub');
 const bodyParser = require('body-parser');
 const {SecretManagerServiceClient} = require('@google-cloud/secret-manager');
@@ -17,7 +18,7 @@ const auth = new GoogleAuth();
 const datastore = new Datastore();
 
 const secrets = new Map();
-async function getSecret(secretName) {
+async function getSecret(secretName: string) {
   let secret = secrets.get(secretName);
 
   if (!secret) {
@@ -56,10 +57,13 @@ async function createDecipher() {
 const app = express();
 
 // TODO(tjohns): rawBodySaver, while a prolific hack, is still a hack
-// Consider a PR for body-parser that leaves the rawBody in place, or
-// make the 'verify' async
-function rawBodySaver (req, res, buf, encoding) {
+// Consider either:
+// - a PR for body-parser that leaves the rawBody in place, or
+// - a PR for body-parser that makes the 'verify' async
+// - writing a 'verify' that synchronously verifies the signature
+function rawBodySaver (req: Request, res: Response, buf: Buffer, encoding: BufferEncoding) {
   if (buf && buf.length) {
+    // @ts-ignore TODO(tjohns): Fix this, see above
     req.rawBody = buf.toString(encoding || 'utf8')
   }
 }
@@ -67,7 +71,7 @@ function rawBodySaver (req, res, buf, encoding) {
 app.use(bodyParser.urlencoded({ extended: true, verify: rawBodySaver}));
 app.set('view engine', 'ejs');
 
-app.post('/', async (req, res, next) => {
+app.post('/', async (req: Request, res: Response, next) => {
 
   try {
 
@@ -80,6 +84,7 @@ app.post('/', async (req, res, next) => {
       signingSecret: await getSecret('slack_signing_secret'),
       requestSignature: req.headers['x-slack-signature'],
       requestTimestamp: req.headers['x-slack-request-timestamp'],
+      // @ts-ignore TODO(tjohns): Fix this, see above
       body: req.rawBody,
     };
 
@@ -170,7 +175,7 @@ app.post('/slackappinstall', async (req, res, next) => {
   }
 })
 
-app.get('/slackappprivacy', async (req, res, nex) => {
+app.get('/slackappprivacy', async (req, res, next) => {
   try {
     res.render('privacy');
   } catch(error) {
@@ -178,7 +183,7 @@ app.get('/slackappprivacy', async (req, res, nex) => {
   }
 })
 
-app.get('/slackappsupport', async (req, res, nex) => {
+app.get('/slackappsupport', async (req, res, next) => {
   try {
     res.render('support');
   } catch(error) {
