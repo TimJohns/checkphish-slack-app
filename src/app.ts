@@ -7,6 +7,7 @@ import bodyParser from "body-parser";
 import { createSecretsCache } from "./secrets";
 import { createAuthController, AuthController } from "./authController";
 import { createSlackAppController, SlackAppController } from "./slackAppController";
+import { createPubSubController, PubSubController } from "./pubsubController";
 
 declare var process : {
   env: {
@@ -20,13 +21,19 @@ class CheckPhishSlackApp {
   private app: any;
   private authController: AuthController;
   private slackAppController: SlackAppController;
+  private pubSubController: PubSubController;
   private port: number;
 
-  constructor(app: any, authController: AuthController, slackAppController: SlackAppController) {
+  constructor(
+    app: any,
+    authController: AuthController,
+    slackAppController: SlackAppController,
+    pubSubController: PubSubController) {
     this.app = app;
     this.authController = authController;
     this.slackAppController = slackAppController;
     this.port = process.env.PORT || 8080;
+    this.pubSubController = pubSubController;
   }
 
   setupExpress() {
@@ -44,6 +51,7 @@ class CheckPhishSlackApp {
     }
 
     app.use(bodyParser.urlencoded({ extended: true, verify: verifyURLEncodedBody}));
+    app.use(bodyParser.json());
 
     app.set( "views", path.join( __dirname, "views" ) );
     app.set('view engine', 'ejs');
@@ -108,6 +116,14 @@ class CheckPhishSlackApp {
       }
     });
 
+    app.post('/pubsub/push', async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        return this.pubSubController.handlePOSTPubSubPush(req, res);
+      } catch(error) {
+        console.error(`Error handling PubSub Push POST request: ${error}`);
+        next(error);
+      }
+    });
 
     // Start the server
     app.listen(port, () => {
@@ -118,20 +134,27 @@ class CheckPhishSlackApp {
 };
 
 async function init() {
+
   const app = express();
   const secrets = createSecretsCache();
-  const authControllerParams = {
+  const stateTokenCipherKey = await secrets.getSecret('cipher_key');
+  const stateTokenCipherIV= process.env.CIPHER_IV
+
+  const authController = createAuthController({
     slackClientId: process.env.SLACK_CLIENT_ID,
     slackClientSecret: await secrets.getSecret('slack_client_secret'),
-    stateTokenCipherKey: await secrets.getSecret('cipher_key'),
-    stateTokenCipherIV: process.env.CIPHER_IV
-  };
-
-  const authController = createAuthController(authControllerParams);
+    stateTokenCipherKey,
+    stateTokenCipherIV
+  });
   const signingSecret = await secrets.getSecret('slack_signing_secret');
   const slackAppController = createSlackAppController(signingSecret);
+  const pubSubController = createPubSubController({
+    defaultCheckPhishAPIKey: await secrets.getSecret('checkphish_api_key'),
+    stateTokenCipherKey,
+    stateTokenCipherIV
+  });
 
-  return new CheckPhishSlackApp(app, authController, slackAppController);
+  return new CheckPhishSlackApp(app, authController, slackAppController, pubSubController);
 }
 
 init().then((checkPhishSlackApp) => {
