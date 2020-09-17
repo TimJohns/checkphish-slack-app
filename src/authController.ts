@@ -3,6 +3,7 @@ import qs from "qs";
 import crypto from "crypto";
 import { Request, Response } from "express";
 import { Datastore } from "@google-cloud/datastore";
+import { UserData, UserModel } from "./models/userModel";
 
 export interface AuthController {
   // TODO(tjohns): Figure out what these returned promises actually SHOULD be (not 'any', most likely)
@@ -28,16 +29,6 @@ export function createAuthController(params: AuthControllerParams) {
 type StateToken = {
   apiKey?: string
 };
-
-// TODO(tjohns): Move this UserData type somewhere else, it's not unique to the authController.
-type UserData = {
-  // TODO(tjohns): user is not really 'any', it's Slack's type. Use that type or create a bounded context
-  user: any,
-  // TODO(tjohns): team is not really 'any', it's Slack's type. Use that type or create a bounded context
-  team: any,
-  apiKey?: string
-};
-
 
 class AuthControllerImpl implements AuthController {
   private slackClientId: string;
@@ -166,22 +157,17 @@ class AuthControllerImpl implements AuthController {
     } // else the installer did NOT provide an API key, and will therefore remain
       // anonymous, and we'll (ultimately) use OUR API key to make the CheckPhish requests
 
-
-    // Per https://api.slack.com/methods/users.identity:
-    //
-    // User IDs are not guaranteed to be globally unique across all Slack users. The combination
-    // of user ID and team ID, on the other hand, is guaranteed to be globally unique.
-    //
-    // Therefore, we're going to create our key by concatenating the two.
-    const slackUserKeyName = `${exchangeResponse.data.team.id}.${exchangeResponse.data.authed_user.id}`;
-    const slackUserKey = datastore.key(["SlackUser", slackUserKeyName]);
-    const slackUser = {
-      key: slackUserKey,
-      data: userData
-    };
+    const slackUser = new UserModel({
+      teamId: userData.team.id,
+      userId: userData.user.id,
+      userData
+    });
 
     // Save the user info (including the API Key for the user)
-    const result = await datastore.save(slackUser);
+    const result = await datastore.save({
+      key: datastore.key(slackUser.getKeyPath()),
+      data: slackUser.getData()
+    });
 
     // TODO(tjohns): Remove this
     console.log(`Saved slackUser: ${JSON.stringify({slackUser})}.`);

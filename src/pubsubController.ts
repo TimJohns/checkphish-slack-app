@@ -4,6 +4,7 @@ import { Datastore } from "@google-cloud/datastore";
 import crypto from "crypto";
 import axios from "axios";
 import { SectionBlock } from "@slack/types";
+import { UserModel } from "./models/userModel";
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -74,17 +75,17 @@ class PubSubControllerImpl implements PubSubController {
       return apiKey;
     };
 
-    const slackUserKeyName = `${teamId}.${userId}`;
+    const slackUser = new UserModel({teamId, userId});
 
     const query = datastore
-      .createQuery('SlackUser')
-      .filter('__key__', datastore.key(['SlackUser', slackUserKeyName]));
+      .createQuery('SlackUser') // TODO(tjohns): Do we need the 'kind', here, since it is also in the key filter?
+      .filter('__key__', datastore.key(slackUser.getKeyPath()));
 
-    const [[slackUser]] = await datastore.runQuery(query);
+    const [[slackUserData]] = await datastore.runQuery(query);
 
-    if (slackUser && slackUser.apiKey) {
+    if (slackUserData && slackUserData.apiKey) {
       // The user has their own key, use it
-      return await decryptAPIKey(slackUser.apiKey);
+      return await decryptAPIKey(slackUserData.apiKey);
 
     } else {
 
