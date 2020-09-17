@@ -3,7 +3,7 @@ import qs from "qs";
 import crypto from "crypto";
 import { Request, Response } from "express";
 import { Datastore } from "@google-cloud/datastore";
-import { UserData, UserModel } from "./models/userModel";
+import { SlackUserData, SlackUserModel } from "./models/slackUserModel";
 
 export interface AuthController {
   // TODO(tjohns): Figure out what these returned promises actually SHOULD be (not 'any', most likely)
@@ -139,7 +139,7 @@ class AuthControllerImpl implements AuthController {
     // TODO(tjohns) Remove this log statement.
     console.log(JSON.stringify({exchangeResponse: exchangeResponse.data}));
 
-    const userData: UserData = {
+    const slackUserData: SlackUserData = {
       user: exchangeResponse.data.authed_user,
       team: exchangeResponse.data.team,
     };
@@ -152,15 +152,15 @@ class AuthControllerImpl implements AuthController {
       // TODO(tjohns): Don't use the stateTokenCiper for encrypting the apiKey in the db - Use a
       // different key, and store the IV alongside the encrypted value.
       const cipher = await this.createCipher();
-      userData.apiKey = cipher.update(stateToken.apiKey, 'utf8', 'base64') + cipher.final('base64');
+      slackUserData.apiKey = cipher.update(stateToken.apiKey, 'utf8', 'base64') + cipher.final('base64');
 
     } // else the installer did NOT provide an API key, and will therefore remain
       // anonymous, and we'll (ultimately) use OUR API key to make the CheckPhish requests
 
-    const slackUser = new UserModel({
-      teamId: userData.team.id,
-      userId: userData.user.id,
-      userData
+    const slackUser = new SlackUserModel({
+      teamId: slackUserData.team.id,
+      userId: slackUserData.user.id,
+      userData: slackUserData
     });
 
     // Save the user info (including the API Key for the user)
@@ -169,18 +169,6 @@ class AuthControllerImpl implements AuthController {
       data: slackUser.getData()
     });
 
-    // TODO(tjohns): Remove this
-    console.log(`Saved slackUser: ${JSON.stringify({slackUser})}.`);
-    console.log(`Saved slackUser result: ${JSON.stringify({result})}.`);
-
-
-    let teamName = "Team";
-    if (exchangeResponse
-      && exchangeResponse.data
-      && exchangeResponse.data.team
-      && exchangeResponse.data.team.name) {
-        teamName = exchangeResponse.data.team.name;
-      }
 
     // TODO(tjohns): Provide some context on how the installation was handled;
     // in other words, let the user know which of these scenarios they're in:
@@ -193,7 +181,7 @@ class AuthControllerImpl implements AuthController {
     //      With the specified token now used for tean-wide access
     // Provide the user some instruction on how to fix what they did, if
     // it wasn't what they intended.
-    res.redirect(`/authsuccess?${qs.stringify({teamName})}`);
+    res.redirect(`/authsuccess?${qs.stringify({teamName: exchangeResponse.data.team.name})}`);
 
   };
 

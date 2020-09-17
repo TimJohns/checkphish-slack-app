@@ -6,18 +6,20 @@ export interface DatastoreModel {
   getData(): any;
 };
 
-export type UserData = {
+export type SlackUserData = {
   // TODO(tjohns): user is not really 'any', it's Slack's type. Use that type or create a bounded context
   user: any,
   // TODO(tjohns): team is not really 'any', it's Slack's type. Use that type or create a bounded context
   team: any,
+  // TODO(tjohns): apiKey doesn't really belong to the Slack User (and therefore
+  // probably not in this model...)
   apiKey?: string
 };
 
-export class UserModel implements DatastoreModel {
+export class SlackUserModel implements DatastoreModel {
   private userKeyName: string;
-  private userData: UserData;
-  constructor(params: {teamId: string, userId: string, userData?: UserData}) {
+  private userData: SlackUserData;
+  constructor(params: {teamId: string, userId: string, userData?: SlackUserData}) {
     // Per https://api.slack.com/methods/users.identity:
     //
     // User IDs are not guaranteed to be globally unique across all Slack users. The combination

@@ -13,7 +13,8 @@ declare var process : {
   env: {
     PORT: number,
     SLACK_CLIENT_ID: string,
-    CIPHER_IV: string
+    CIPHER_IV: string,
+    PUBSUB_SUBSCRIPTION_AUDIENCE: string
   }
 }
 
@@ -150,6 +151,7 @@ async function init() {
   const slackAppController = createSlackAppController(signingSecret);
   const pubSubController = createPubSubController({
     defaultCheckPhishAPIKey: await secrets.getSecret('checkphish_api_key'),
+    audience: process.env.PUBSUB_SUBSCRIPTION_AUDIENCE,
     stateTokenCipherKey,
     stateTokenCipherIV
   });

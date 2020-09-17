@@ -4,7 +4,7 @@ import { Datastore } from "@google-cloud/datastore";
 import crypto from "crypto";
 import axios from "axios";
 import { SectionBlock } from "@slack/types";
-import { UserModel } from "./models/userModel";
+import { SlackUserModel } from "./models/slackUserModel";
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -16,6 +16,7 @@ export interface PubSubController {
 export type PubSubControllerParams = {
   stateTokenCipherKey: string,
   stateTokenCipherIV: string,
+  audience: string,
   defaultCheckPhishAPIKey: string,
 };
 
@@ -32,6 +33,7 @@ type GetCheckPhishAPIParams = {
 
 class PubSubControllerImpl implements PubSubController {
   private authClient: JWT;
+  private audience: string;
   private datastore: Datastore;
   private stateTokenCipherKey: string;
   private stateTokenCipherIV: string;
@@ -45,6 +47,7 @@ class PubSubControllerImpl implements PubSubController {
       this.stateTokenCipherKey = params.stateTokenCipherKey;
       this.stateTokenCipherIV = params.stateTokenCipherIV;
       this.defaultCheckPhishAPIKey = params.defaultCheckPhishAPIKey;
+      this.audience = params.audience;
       this.authClient = authClient;
       this.datastore = datastore;
   };
@@ -75,7 +78,7 @@ class PubSubControllerImpl implements PubSubController {
       return apiKey;
     };
 
-    const slackUser = new UserModel({teamId, userId});
+    const slackUser = new SlackUserModel({teamId, userId});
 
     const query = datastore
       .createQuery('SlackUser') // TODO(tjohns): Do we need the 'kind', here, since it is also in the key filter?
@@ -98,6 +101,7 @@ class PubSubControllerImpl implements PubSubController {
   async handlePOSTPubSubPush(req: Request, res: Response) {
 
     const authClient = this.authClient;
+    const audience = this.audience;
 
     // Get the Cloud Pub/Sub-generated JWT in the "Authorization" header.
     const bearer = req.header('Authorization');
@@ -116,9 +120,15 @@ class PubSubControllerImpl implements PubSubController {
       return;
     }
 
-    // TODO(tjohns): validate the intended audience
     try {
-      const ticket = await authClient.verifyIdToken({idToken});
+      // TODO(tjohns): Remove these two log messages
+      console.log({idToken});
+      console.log({audience});
+
+      const ticket = await authClient.verifyIdToken({
+        idToken,
+        audience
+      });
 
       const claim = ticket.getPayload();
 
