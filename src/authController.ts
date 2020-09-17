@@ -177,10 +177,9 @@ class AuthControllerImpl implements AuthController {
     const slackUserKey = datastore.key(["SlackUser", slackUserKeyName]);
     const slackUser = {
       key: slackUserKey,
-      data: {
-        apiKey: userData
-      }
+      data: userData
     };
+
     // Save the user info (including the API Key for the user)
     const result = await datastore.save(slackUser);
 
