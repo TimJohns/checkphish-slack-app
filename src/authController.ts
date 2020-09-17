@@ -73,7 +73,7 @@ class AuthControllerImpl implements AuthController {
     console.log(JSON.stringify({body: req.body}));
 
     // TODO(tjohns) Pass 'SLACK_CLIENT_ID' in as a dependency
-    let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${this.slackClientSecret}&scope=commands&user_scope=`;
+    let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${this.slackClientId}&scope=commands&user_scope=`;
     const apiKey = (req.body.apiKey || '').trim()
     if (apiKey.length) {
 
@@ -145,11 +145,19 @@ class AuthControllerImpl implements AuthController {
       const cipher = await this.createCipher();
       let encryptedAPIKey = cipher.update(stateToken.apiKey as string, 'utf8', 'base64') + cipher.final('base64');
 
-      const slackUserKey = datastore.key(["SlackUser", exchangeResponse.data.authed_user.id]);
+      // Per https://api.slack.com/methods/users.identity:
+      //
+      // User IDs are not guaranteed to be globally unique across all Slack users. The combination
+      // of user ID and team ID, on the other hand, is guaranteed to be globally unique.
+      //
+      // Therefore, we're going to create our key by concatenating the two.
+      const slackUserKeyName = `${exchangeResponse.data.team.id}.${exchangeResponse.data.authed_user.id}`;
+      const slackUserKey = datastore.key(["SlackUser", slackUserKeyName]);
       const slackUser = {
         key: slackUserKey,
         data: {
           user: exchangeResponse.data.authed_user,
+          team: exchangeResponse.data.team,
           apiKey: encryptedAPIKey
         }
       };

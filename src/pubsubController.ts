@@ -74,9 +74,11 @@ class PubSubControllerImpl implements PubSubController {
       return apiKey;
     };
 
+    const slackUserKeyName = `${teamId}.${userId}`;
+
     const query = datastore
       .createQuery('SlackUser')
-      .filter('__key__', datastore.key(['SlackUser', userId]));
+      .filter('__key__', datastore.key(['SlackUser', slackUserKeyName]));
 
     const [[slackUser]] = await datastore.runQuery(query);
 
@@ -86,21 +88,8 @@ class PubSubControllerImpl implements PubSubController {
 
     } else {
 
-      const query = datastore
-        .createQuery('SlackTeam')
-        .filter('__key__', datastore.key(['SlackTeam', teamId]));
-
-      const [[slackTeam]] = await datastore.runQuery(query);
-
-      if (slackTeam && slackTeam.apiKey) {
-
-        // There is a team-wide key, use it
-        return await decryptAPIKey(slackTeam.apiKey);
-
-      } else {
-        // No team-specific or user-specific key found, use ours (the default)
-        return defaultCheckPhishAPIKey;
-      }
+      // No team-specific or user-specific key found, use ours (the default)
+      return defaultCheckPhishAPIKey;
     }
   };
 
@@ -118,23 +107,17 @@ class PubSubControllerImpl implements PubSubController {
       return;
     }
 
-    const [, token] = bearer.match(/Bearer (.*)/);
-    if (!token) {
+    const [, idToken] = bearer.match(/Bearer (.*)/);
+    if (!idToken) {
       console.error('No Bearer token. Unauthorized.');
       res.setHeader("WWW-Authenticate", "Bearer realm=\"PubSub Push\"");
       res.status(401).send('Unauthorized\n');
       return;
     }
 
-    // TODO(tjohns): Remove this log statement
-    console.log(JSON.stringify({token}));
-
-    // TODO(tjohns): test what happens with a bogus JWT - does this throw? What's the behavior
     // TODO(tjohns): validate the intended audience
     try {
-      const ticket = await authClient.verifyIdToken({
-        idToken: token
-      });
+      const ticket = await authClient.verifyIdToken({idToken});
 
       const claim = ticket.getPayload();
 
@@ -162,7 +145,6 @@ class PubSubControllerImpl implements PubSubController {
       });
 
 
-      // TODO(tjohns): Handle errors
       // TODO(tjohns): parameterize URL
       const scanResponse = await axios(
         {
@@ -251,7 +233,6 @@ async function pollStatus(job: Job, responseUrl: string) {
     console.log(JSON.stringify({responsePayload}));
 
     // TODO(tjohns): Handle errors
-    // TODO(tjohns): parameterize URL
     const messageResponse = await axios(
       {
       method: 'post',
