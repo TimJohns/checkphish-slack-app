@@ -25,6 +25,20 @@ export function createAuthController(params: AuthControllerParams) {
   return new AuthControllerImpl(params, datastore);
 };
 
+type StateToken = {
+  apiKey?: string
+};
+
+// TODO(tjohns): Move this UserData type somewhere else, it's not unique to the authController.
+type UserData = {
+  // TODO(tjohns): user is not really 'any', it's Slack's type. Use that type or create a bounded context
+  user: any,
+  // TODO(tjohns): team is not really 'any', it's Slack's type. Use that type or create a bounded context
+  team: any,
+  apiKey?: string
+};
+
+
 class AuthControllerImpl implements AuthController {
   private slackClientId: string;
   private slackClientSecret: string;
@@ -72,30 +86,28 @@ class AuthControllerImpl implements AuthController {
     // TODO(tjohns): Remove this console log
     console.log(JSON.stringify({body: req.body}));
 
-    // TODO(tjohns) Pass 'SLACK_CLIENT_ID' in as a dependency
     let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${this.slackClientId}&scope=commands&user_scope=`;
     const apiKey = (req.body.apiKey || '').trim()
+    const stateToken: StateToken = {};
     if (apiKey.length) {
-
-      // TODO(tjohns): Verify CSRF token (I'm not sure this is strictly necessary, since the
-      // apiKey is, in effect, a form of identity token, but I'm 100% certain if I DON'T
-      // use a CSRF token, I'll have to explain that, since it's standard practice - and
-      // of course I might be wrong!)
-
-      // TODO(tjohns): Make a trial request with the API key to verify it's valid (at that one
-      // moment, anyway)
-
-      const stateToken = {
-        apiKey
-      };
-
-      const stateTokenStr = JSON.stringify(stateToken);
-      // Encrypt the state token
-      const cipher = await this.createCipher();
-      const encryptedStateToken = cipher.update(stateTokenStr, 'utf8', 'base64') + cipher.final('base64');
-
-      destUrl += "&state=" + encodeURIComponent(encryptedStateToken);
+      stateToken.apiKey = apiKey;
     }
+
+    // TODO(tjohns): Verify CSRF token (I'm not sure this is strictly necessary, since the
+    // apiKey is, in effect, a form of identity token, but I'm 100% certain if I DON'T
+    // use a CSRF token, I'll have to explain that, since it's standard practice - and
+    // of course I might be wrong!)
+
+    // TODO(tjohns): Make a trial request with the API key to verify it's valid (at that one
+    // moment, anyway)
+
+    const stateTokenStr = JSON.stringify(stateToken);
+    // Encrypt the state token
+    const cipher = await this.createCipher();
+    const encryptedStateToken = cipher.update(stateTokenStr, 'utf8', 'base64') + cipher.final('base64');
+
+    destUrl += "&state=" + encodeURIComponent(encryptedStateToken);
+
     res.redirect(destUrl);
   };
 
@@ -115,8 +127,7 @@ class AuthControllerImpl implements AuthController {
     const decipher = await this.createDecipher();
     const stateTokenStr = decipher.update(req.query.state as string, 'base64', 'utf8') + decipher.final('utf8');
 
-    // TODO(tjohns): Create a type for the StateToken
-    let stateToken = JSON.parse(stateTokenStr);
+    const stateToken: StateToken = JSON.parse(stateTokenStr);
 
     // TODO(tjohns): Remove this log statement
     console.log(stateTokenStr);
@@ -137,39 +148,46 @@ class AuthControllerImpl implements AuthController {
     // TODO(tjohns) Remove this log statement.
     console.log(JSON.stringify({exchangeResponse: exchangeResponse.data}));
 
+    const userData: UserData = {
+      user: exchangeResponse.data.authed_user,
+      team: exchangeResponse.data.team,
+    };
+
     if (stateToken.apiKey) {
 
       // The installer provided an API Key, so we will use it.
 
       // re-encrypt the API key
+      // TODO(tjohns): Don't use the stateTokenCiper for encrypting the apiKey in the db - Use a
+      // different key, and store the IV alongside the encrypted value.
       const cipher = await this.createCipher();
-      let encryptedAPIKey = cipher.update(stateToken.apiKey as string, 'utf8', 'base64') + cipher.final('base64');
-
-      // Per https://api.slack.com/methods/users.identity:
-      //
-      // User IDs are not guaranteed to be globally unique across all Slack users. The combination
-      // of user ID and team ID, on the other hand, is guaranteed to be globally unique.
-      //
-      // Therefore, we're going to create our key by concatenating the two.
-      const slackUserKeyName = `${exchangeResponse.data.team.id}.${exchangeResponse.data.authed_user.id}`;
-      const slackUserKey = datastore.key(["SlackUser", slackUserKeyName]);
-      const slackUser = {
-        key: slackUserKey,
-        data: {
-          user: exchangeResponse.data.authed_user,
-          team: exchangeResponse.data.team,
-          apiKey: encryptedAPIKey
-        }
-      };
-      // Save the user info (including the API Key for the user)
-      const result = await datastore.save(slackUser);
-
-      // TODO(tjohns): Remove this
-      console.log(`Saved slackUser: ${JSON.stringify({slackUser})}.`);
-      console.log(`Saved slackUser result: ${JSON.stringify({result})}.`);
+      userData.apiKey = cipher.update(stateToken.apiKey, 'utf8', 'base64') + cipher.final('base64');
 
     } // else the installer did NOT provide an API key, and will therefore remain
       // anonymous, and we'll (ultimately) use OUR API key to make the CheckPhish requests
+
+
+    // Per https://api.slack.com/methods/users.identity:
+    //
+    // User IDs are not guaranteed to be globally unique across all Slack users. The combination
+    // of user ID and team ID, on the other hand, is guaranteed to be globally unique.
+    //
+    // Therefore, we're going to create our key by concatenating the two.
+    const slackUserKeyName = `${exchangeResponse.data.team.id}.${exchangeResponse.data.authed_user.id}`;
+    const slackUserKey = datastore.key(["SlackUser", slackUserKeyName]);
+    const slackUser = {
+      key: slackUserKey,
+      data: {
+        apiKey: userData
+      }
+    };
+    // Save the user info (including the API Key for the user)
+    const result = await datastore.save(slackUser);
+
+    // TODO(tjohns): Remove this
+    console.log(`Saved slackUser: ${JSON.stringify({slackUser})}.`);
+    console.log(`Saved slackUser result: ${JSON.stringify({result})}.`);
+
 
     let teamName = "Team";
     if (exchangeResponse
