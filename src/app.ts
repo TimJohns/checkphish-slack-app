@@ -10,7 +10,9 @@ import { createSlackAppController, SlackAppController } from "./slackAppControll
 
 declare var process : {
   env: {
-    PORT: number
+    PORT: number,
+    SLACK_CLIENT_ID: string,
+    CIPHER_IV: string
   }
 }
 
@@ -61,7 +63,6 @@ class CheckPhishSlackApp {
         next(error);
       }
     })
-
 
     app.get('/slackappinstall', async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -119,7 +120,14 @@ class CheckPhishSlackApp {
 async function init() {
   const app = express();
   const secrets = createSecretsCache();
-  const authController = createAuthController(secrets);
+  const authControllerParams = {
+    slackClientId: process.env.SLACK_CLIENT_ID,
+    slackClientSecret: await secrets.getSecret('slack_client_secret'),
+    stateTokenCipherKey: await secrets.getSecret('cipher_key'),
+    stateTokenCipherIV: process.env.CIPHER_IV
+  };
+
+  const authController = createAuthController(authControllerParams);
   const signingSecret = await secrets.getSecret('slack_signing_secret');
   const slackAppController = createSlackAppController(signingSecret);
 

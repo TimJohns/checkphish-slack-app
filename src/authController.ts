@@ -2,9 +2,7 @@ import axios from "axios";
 import qs from "qs";
 import crypto from "crypto";
 import { Request, Response } from "express";
-import {Datastore} from "@google-cloud/datastore";
-
-import {Secrets} from "./secrets";
+import { Datastore } from "@google-cloud/datastore";
 
 export interface AuthController {
   // TODO(tjohns): Figure out what these returned promises actually SHOULD be (not 'any', most likely)
@@ -15,37 +13,50 @@ export interface AuthController {
   handleGETAuthFailed(req: Request, res: Response): Promise<any>;
 };
 
-export function createAuthController(secrets: Secrets) {
+export type AuthControllerParams = {
+  slackClientId: string,
+  slackClientSecret: string,
+  stateTokenCipherKey: string,
+  stateTokenCipherIV: string
+};
+
+export function createAuthController(params: AuthControllerParams) {
   const datastore = new Datastore();
-  return new AuthControllerImpl(secrets, datastore);
+  return new AuthControllerImpl(params, datastore);
 };
 
 class AuthControllerImpl implements AuthController {
-  private secrets: Secrets;
+  private slackClientId: string;
+  private slackClientSecret: string;
+  private stateTokenCipherKey: string;
+  private stateTokenCipherIV: string;
   private datastore: Datastore;
 
   constructor(
-    secrets: Secrets,
+    params: AuthControllerParams,
     datastore: Datastore
     ) {
-    this.secrets = secrets;
-    this.datastore = datastore;
+      this.slackClientId = params.slackClientId;
+      this.slackClientSecret = params.slackClientSecret;
+      this.stateTokenCipherKey = params.stateTokenCipherKey;
+      this.stateTokenCipherIV = params.stateTokenCipherIV;
+      this.datastore = datastore;
   };
 
   private async createCipher(): Promise<crypto.Cipher> {
 
-    const key = await this.secrets.getSecret('cipher_key');
+    const key = this.stateTokenCipherKey;
     const algorithm = 'aes-256-cbc';
-    const iv = process.env.CIPHER_IV;
+    const iv = this.stateTokenCipherIV;
 
     return crypto.createCipheriv(algorithm, key, iv);
   };
 
   private async createDecipher(): Promise<crypto.Decipher> {
 
-    const key = await this.secrets.getSecret('cipher_key');
+    const key = this.stateTokenCipherKey;
     const algorithm = 'aes-256-cbc';
-    const iv = process.env.CIPHER_IV;
+    const iv = this.stateTokenCipherIV;
 
     return crypto.createDecipheriv(algorithm, key, iv);
   };
@@ -62,7 +73,7 @@ class AuthControllerImpl implements AuthController {
     console.log(JSON.stringify({body: req.body}));
 
     // TODO(tjohns) Pass 'SLACK_CLIENT_ID' in as a dependency
-    let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=commands&user_scope=`;
+    let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${this.slackClientSecret}&scope=commands&user_scope=`;
     const apiKey = (req.body.apiKey || '').trim()
     if (apiKey.length) {
 
@@ -90,7 +101,6 @@ class AuthControllerImpl implements AuthController {
 
   // TODO(tjohns): Figure out how to specify query parameter allowed values w/TypeScript
   async handleGETAuth(req: Request, res: Response) {
-    const secrets = this.secrets;
     const datastore = this.datastore;
 
     if (req.query.error) {
@@ -99,7 +109,7 @@ class AuthControllerImpl implements AuthController {
       return;
     }
 
-    const userPass = `${process.env.SLACK_CLIENT_ID}:${await secrets.getSecret('slack_client_secret')}`;
+    const userPass = `${this.slackClientId}:${this.slackClientSecret}`;
     const basicCredentials = Buffer.from(userPass).toString('base64');
     // TODO(tjohns): Verify something here (in addition to just saving off the API Key)
     const decipher = await this.createDecipher();
