@@ -107,27 +107,48 @@ class PubSubControllerImpl implements PubSubController {
 
   async handlePOSTPubSubPush(req: Request, res: Response) {
 
+    const authClient = this.authClient;
+
+    // Get the Cloud Pub/Sub-generated JWT in the "Authorization" header.
+    const bearer = req.header('Authorization');
+    if (!bearer) {
+      console.error('No authorization header. Unauthorized.');
+      res.setHeader("WWW-Authenticate", "Bearer realm=\"PubSub Push\"");
+      res.status(401).send('Unauthorized\n');
+      return;
+    }
+
+    const [, token] = bearer.match(/Bearer (.*)/);
+    if (!token) {
+      console.error('No Bearer token. Unauthorized.');
+      res.setHeader("WWW-Authenticate", "Bearer realm=\"PubSub Push\"");
+      res.status(401).send('Unauthorized\n');
+      return;
+    }
+
+    // TODO(tjohns): Remove this log statement
+    console.log(JSON.stringify({token}));
+
+    // TODO(tjohns): test what happens with a bogus JWT - does this throw? What's the behavior
+    // TODO(tjohns): validate the intended audience
     try {
-      const authClient = this.authClient;
-
-      // Get the Cloud Pub/Sub-generated JWT in the "Authorization" header.
-      const bearer = req.header('Authorization');
-      const [, token] = bearer.match(/Bearer (.*)/);
-
-      // TODO(tjohns): Remove this log statement
-      console.log(JSON.stringify({token}));
-
-      // TODO(tjohns): validate the intended audience
       const ticket = await authClient.verifyIdToken({
-        idToken: token,
-  //      audience: 'example.com',
+        idToken: token
       });
-
-      // TODO(tjohns): test what happens with a bogus JWT - does this throw? What's the behavior
 
       const claim = ticket.getPayload();
 
+      // TODO(tjohns): Remove this log message
       console.log(JSON.stringify({claim}));
+
+    } catch(error) {
+      console.error('Incorrect credentials. Forbidden.');
+      res.status(403).send('Forbidden\n');
+      return;
+    }
+
+
+    try {
 
       console.log(JSON.stringify({body: req.body}));
 
