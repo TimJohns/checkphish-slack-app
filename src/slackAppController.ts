@@ -3,8 +3,7 @@ import { verifyRequestSignature } from "@slack/events-api";
 import { PubSub } from "@google-cloud/pubsub";
 
 export interface SlackAppController {
-  // TODO(tjohns): Figure out what these returned promises actually SHOULD be (not 'any', most likely)
-  handlePOSTSlashCommand(req: Request, res: Response): Promise<any>;
+  handlePOSTSlashCommand(req: Request, res: Response): Promise<void>;
 
   verifyURLEncodedBody(req: Request, buf: Buffer, encoding: BufferEncoding): void;
 };

@@ -9,8 +9,7 @@ import { SlackUserModel } from "./models/slackUserModel";
 const POLL_INTERVAL_MS = 1000;
 
 export interface PubSubController {
-  // TODO(tjohns): Figure out what these returned promises actually SHOULD be (not 'any', most likely)
-  handlePOSTPubSubPush(req: Request, res: Response): Promise<any>;
+  handlePOSTPubSubPush(req: Request, res: Response): Promise<void>;
 };
 
 export type PubSubControllerParams = {

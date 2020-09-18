@@ -6,12 +6,11 @@ import { Datastore } from "@google-cloud/datastore";
 import { SlackUserData, SlackUserModel } from "./models/slackUserModel";
 
 export interface AuthController {
-  // TODO(tjohns): Figure out what these returned promises actually SHOULD be (not 'any', most likely)
-  handleGETInstall(req: Request, res: Response): Promise<any>;
-  handlePOSTInstall(req: Request, res: Response): Promise<any>;
-  handleGETAuth(req: Request, res: Response): Promise<any>;
-  handleGETAuthSuccess(req: Request, res: Response): Promise<any>;
-  handleGETAuthFailed(req: Request, res: Response): Promise<any>;
+  handleGETInstall(req: Request, res: Response): Promise<void>;
+  handlePOSTInstall(req: Request, res: Response): Promise<void>;
+  handleGETAuth(req: Request, res: Response): Promise<void>;
+  handleGETAuthSuccess(req: Request, res: Response): Promise<void>;
+  handleGETAuthFailed(req: Request, res: Response): Promise<void>;
 };
 
 export type AuthControllerParams = {

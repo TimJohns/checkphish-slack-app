@@ -75,35 +75,35 @@ class CheckPhishSlackApp {
 
     app.get('/slackappinstall', async (req: Request, res: Response, next: NextFunction) => {
       try {
-        return authController.handleGETInstall(req, res);
+        await authController.handleGETInstall(req, res);
       } catch(error) {
         next(error);
       }
     });
     app.post('/slackappinstall', async (req: Request, res: Response, next: NextFunction) => {
       try {
-        return authController.handlePOSTInstall(req, res);
+        await authController.handlePOSTInstall(req, res);
       } catch(error) {
         next(error);
       }
     });
     app.get('/auth', async (req: Request, res: Response, next: NextFunction) => {
       try {
-        return authController.handleGETAuth(req, res);
+        await authController.handleGETAuth(req, res);
       } catch(error) {
         next(error);
       }
     });
     app.get('/authsuccess', async (req: Request, res: Response, next: NextFunction) => {
       try {
-        return authController.handleGETAuthSuccess(req, res);
+        await authController.handleGETAuthSuccess(req, res);
       } catch(error) {
         next(error);
       }
     });
     app.get('/authfailed', async (req: Request, res: Response, next: NextFunction) => {
       try {
-        return authController.handleGETAuthFailed(req, res);
+        await authController.handleGETAuthFailed(req, res);
       } catch(error) {
         next(error);
       }
@@ -111,7 +111,7 @@ class CheckPhishSlackApp {
 
     app.post('/', async (req: Request, res: Response, next: NextFunction) => {
       try {
-        return slackAppController.handlePOSTSlashCommand(req, res);
+        await slackAppController.handlePOSTSlashCommand(req, res);
       } catch(error) {
         next(error);
       }
@@ -119,7 +119,7 @@ class CheckPhishSlackApp {
 
     app.post('/pubsub/push', async (req: Request, res: Response, next: NextFunction) => {
       try {
-        return this.pubSubController.handlePOSTPubSubPush(req, res);
+        await this.pubSubController.handlePOSTPubSubPush(req, res);
       } catch(error) {
         console.error(`Error handling PubSub Push POST request: ${error}`);
         next(error);
