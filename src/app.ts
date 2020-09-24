@@ -57,6 +57,7 @@ class CheckPhishSlackApp {
     app.set( "views", path.join( __dirname, "views" ) );
     app.set('view engine', 'ejs');
 
+    app.use( express.static( path.join( __dirname, "public" ) ) );
 
     app.get('/_ah/warmup', (req: Request, res: Response) => {
       // We don't actually need to DO anything here, currently, but we must handle this request
@@ -70,16 +71,14 @@ class CheckPhishSlackApp {
       } catch(error) {
         next(error);
       }
-    })
-
+    });
     app.get('/slackappsupport', async (req: Request, res: Response, next: NextFunction) => {
       try {
         res.render('support');
       } catch(error) {
         next(error);
       }
-    })
-
+    });
     app.get('/slackappinstall', async (req: Request, res: Response, next: NextFunction) => {
       try {
         await authController.handleGETInstall(req, res);
@@ -116,7 +115,7 @@ class CheckPhishSlackApp {
       }
     });
 
-    app.post('/', async (req: Request, res: Response, next: NextFunction) => {
+    app.post('/slackappslashcmd', async (req: Request, res: Response, next: NextFunction) => {
       try {
         await slackAppController.handlePOSTSlashCommand(req, res);
       } catch(error) {
