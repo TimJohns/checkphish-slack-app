@@ -107,7 +107,7 @@ class PubSubControllerImpl implements PubSubController {
     if (!bearer) {
       console.error('No authorization header. Unauthorized.');
       res.setHeader("WWW-Authenticate", "Bearer realm=\"PubSub Push\"");
-      res.status(401).send('Unauthorized\n');
+      res.sendStatus(401);
       return;
     }
 
@@ -115,7 +115,7 @@ class PubSubControllerImpl implements PubSubController {
     if (!idToken) {
       console.error('No Bearer token. Unauthorized.');
       res.setHeader("WWW-Authenticate", "Bearer realm=\"PubSub Push\"");
-      res.status(401).send('Unauthorized\n');
+      res.sendStatus(401);
       return;
     }
 
@@ -136,7 +136,7 @@ class PubSubControllerImpl implements PubSubController {
 
     } catch(error) {
       console.error('Incorrect credentials. Forbidden.');
-      res.status(403).send('Forbidden\n');
+      res.sendStatus(403);
       return;
     }
 
@@ -185,7 +185,7 @@ class PubSubControllerImpl implements PubSubController {
       console.error(`Error: ${error.message}`);
     } finally {
       console.log('Returning 200');
-      res.status(200).send();
+      res.sendStatus(200);
     }
   }
 }
