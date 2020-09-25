@@ -11,9 +11,10 @@ export type SlackUserData = {
   user: any,
   // TODO(tjohns): team is not really 'any', it's Slack's type. Use that type or create a bounded context
   team: any,
-  // TODO(tjohns): apiKey doesn't really belong to the Slack User (and therefore
+  // TODO(tjohns): apiKey and apiKeyIV don't really belong to the Slack User (and therefore
   // probably not in this model...)
   apiKey?: string
+  apiKeyIV?: Buffer
 };
 
 export class SlackUserModel implements DatastoreModel {

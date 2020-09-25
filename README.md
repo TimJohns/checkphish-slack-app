@@ -33,7 +33,7 @@ TODO(tjohns): GIF/Video
 
 ### Secrets and Client ID Configuration
 1. Generate an initialization vector (random data) for the state token encryption  TODO(tjohns): Indicate encoding and length
-2. Copy the IV into the app.yaml file's CIPHER_IV value
+2. Copy the IV into the app.yaml file's STATE_TOKEN_CIPHER_IV value
 3. Enter the IV into the Environment Variables for the Google Cloud Function
 4. Find the "App Credentials" under the "Basic Information" settings for your Slack command TODO(tjohns): Better GIF or Video
 5. Copy the Client ID into your app.yaml file where indicated.

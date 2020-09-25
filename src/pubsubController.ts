@@ -13,8 +13,7 @@ export interface PubSubController {
 };
 
 export type PubSubControllerParams = {
-  stateTokenCipherKey: string,
-  stateTokenCipherIV: string,
+  userAPIKeyCipherKey: string,
   audience: string,
   defaultCheckPhishAPIKey: string,
 };
@@ -34,8 +33,7 @@ class PubSubControllerImpl implements PubSubController {
   private authClient: JWT;
   private audience: string;
   private datastore: Datastore;
-  private stateTokenCipherKey: string;
-  private stateTokenCipherIV: string;
+  private userAPIKeyCipherKey: string;
   private defaultCheckPhishAPIKey: string;
 
   constructor(
@@ -43,19 +41,17 @@ class PubSubControllerImpl implements PubSubController {
     authClient: JWT,
     datastore: Datastore
     ) {
-      this.stateTokenCipherKey = params.stateTokenCipherKey;
-      this.stateTokenCipherIV = params.stateTokenCipherIV;
       this.defaultCheckPhishAPIKey = params.defaultCheckPhishAPIKey;
+      this.userAPIKeyCipherKey = params.userAPIKeyCipherKey;
       this.audience = params.audience;
       this.authClient = authClient;
       this.datastore = datastore;
   };
 
-  private async createDecipher(): Promise<crypto.Decipher> {
+  private async createUserAPIKeyDecipher(iv: crypto.BinaryLike): Promise<crypto.Decipher> {
 
-    const key = this.stateTokenCipherKey;
+    const key = this.userAPIKeyCipherKey;
     const algorithm = 'aes-256-cbc';
-    const iv = this.stateTokenCipherIV;
 
     return crypto.createDecipheriv(algorithm, key, iv);
   };
@@ -71,8 +67,8 @@ class PubSubControllerImpl implements PubSubController {
     const controller = this;
     const defaultCheckPhishAPIKey = this.defaultCheckPhishAPIKey;
 
-    const decryptAPIKey = async function(encryptedAPIKey: string) {
-      const decipher = await controller.createDecipher();
+    const decryptAPIKey = async function(encryptedAPIKey: string, apiKeyIV: string) {
+      const decipher = await controller.createUserAPIKeyDecipher(apiKeyIV);
       const apiKey = decipher.update(encryptedAPIKey, 'base64', 'utf8') + decipher.final('utf8');
       return apiKey;
     };
@@ -87,7 +83,7 @@ class PubSubControllerImpl implements PubSubController {
 
     if (slackUserData && slackUserData.apiKey) {
       // The user has their own key, use it
-      return await decryptAPIKey(slackUserData.apiKey);
+      return await decryptAPIKey(slackUserData.apiKey, slackUserData.apiKeyIV);
 
     } else {
 

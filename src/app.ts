@@ -13,7 +13,7 @@ declare var process : {
   env: {
     PORT: number,
     SLACK_CLIENT_ID: string,
-    CIPHER_IV: string,
+    STATE_TOKEN_CIPHER_IV: string,
     PUBSUB_SUBSCRIPTION_AUDIENCE: string
   }
 }
@@ -144,22 +144,21 @@ async function init() {
 
   const app = express();
   const secrets = createSecretsCache();
-  const stateTokenCipherKey = await secrets.getSecret('cipher_key');
-  const stateTokenCipherIV= process.env.CIPHER_IV
+  const userAPIKeyCipherKey = await secrets.getSecret('user_api_key_cipher_key');
 
   const authController = createAuthController({
     slackClientId: process.env.SLACK_CLIENT_ID,
     slackClientSecret: await secrets.getSecret('slack_client_secret'),
-    stateTokenCipherKey,
-    stateTokenCipherIV
+    stateTokenCipherKey: await secrets.getSecret('state_token_cipher_key'),
+    stateTokenCipherIV: process.env.STATE_TOKEN_CIPHER_IV,
+    userAPIKeyCipherKey
   });
   const signingSecret = await secrets.getSecret('slack_signing_secret');
   const slackAppController = createSlackAppController(signingSecret);
   const pubSubController = createPubSubController({
     defaultCheckPhishAPIKey: await secrets.getSecret('checkphish_api_key'),
     audience: process.env.PUBSUB_SUBSCRIPTION_AUDIENCE,
-    stateTokenCipherKey,
-    stateTokenCipherIV
+    userAPIKeyCipherKey
   });
 
   return new CheckPhishSlackApp(app, authController, slackAppController, pubSubController);

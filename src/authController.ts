@@ -5,6 +5,8 @@ import { Request, Response } from "express";
 import { Datastore } from "@google-cloud/datastore";
 import { SlackUserData, SlackUserModel } from "./models/slackUserModel";
 
+const API_KEY_IV_LENGTH = 16;
+
 export interface AuthController {
   handleGETInstall(req: Request, res: Response): Promise<void>;
   handlePOSTInstall(req: Request, res: Response): Promise<void>;
@@ -17,7 +19,8 @@ export type AuthControllerParams = {
   slackClientId: string,
   slackClientSecret: string,
   stateTokenCipherKey: string,
-  stateTokenCipherIV: string
+  stateTokenCipherIV: string,
+  userAPIKeyCipherKey: string
 };
 
 export function createAuthController(params: AuthControllerParams) {
@@ -34,6 +37,7 @@ class AuthControllerImpl implements AuthController {
   private slackClientSecret: string;
   private stateTokenCipherKey: string;
   private stateTokenCipherIV: string;
+  private userAPIKeyCipherKey: string;
   private datastore: Datastore;
 
   constructor(
@@ -43,11 +47,12 @@ class AuthControllerImpl implements AuthController {
       this.slackClientId = params.slackClientId;
       this.slackClientSecret = params.slackClientSecret;
       this.stateTokenCipherKey = params.stateTokenCipherKey;
+      this.userAPIKeyCipherKey = params.userAPIKeyCipherKey;
       this.stateTokenCipherIV = params.stateTokenCipherIV;
       this.datastore = datastore;
   };
 
-  private async createCipher(): Promise<crypto.Cipher> {
+  private async createStateTokenCipher(): Promise<crypto.Cipher> {
 
     const key = this.stateTokenCipherKey;
     const algorithm = 'aes-256-cbc';
@@ -56,7 +61,7 @@ class AuthControllerImpl implements AuthController {
     return crypto.createCipheriv(algorithm, key, iv);
   };
 
-  private async createDecipher(): Promise<crypto.Decipher> {
+  private async createStateTokenDecipher(): Promise<crypto.Decipher> {
 
     const key = this.stateTokenCipherKey;
     const algorithm = 'aes-256-cbc';
@@ -65,6 +70,13 @@ class AuthControllerImpl implements AuthController {
     return crypto.createDecipheriv(algorithm, key, iv);
   };
 
+  private async createUserAPIKeyCipher(iv: crypto.BinaryLike): Promise<crypto.Cipher> {
+
+    const key = this.userAPIKeyCipherKey;
+    const algorithm = 'aes-256-cbc';
+
+    return crypto.createCipheriv(algorithm, key, iv);
+  };
 
   async handleGETInstall(req: Request, res: Response) {
     // TODO(tjohns): Generate CSRF/OTP Session Token (nonce + timestamp + random)
@@ -93,7 +105,7 @@ class AuthControllerImpl implements AuthController {
 
     const stateTokenStr = JSON.stringify(stateToken);
     // Encrypt the state token
-    const cipher = await this.createCipher();
+    const cipher = await this.createStateTokenCipher();
     const encryptedStateToken = cipher.update(stateTokenStr, 'utf8', 'base64') + cipher.final('base64');
 
     destUrl += "&state=" + encodeURIComponent(encryptedStateToken);
@@ -114,7 +126,7 @@ class AuthControllerImpl implements AuthController {
     const userPass = `${this.slackClientId}:${this.slackClientSecret}`;
     const basicCredentials = Buffer.from(userPass).toString('base64');
     // TODO(tjohns): Verify something here (in addition to just saving off the API Key)
-    const decipher = await this.createDecipher();
+    const decipher = await this.createStateTokenDecipher();
     const stateTokenStr = decipher.update(req.query.state as string, 'base64', 'utf8') + decipher.final('utf8');
 
     const stateToken: StateToken = JSON.parse(stateTokenStr);
@@ -147,10 +159,9 @@ class AuthControllerImpl implements AuthController {
 
       // The installer provided an API Key, so we will use it.
 
-      // re-encrypt the API key
-      // TODO(tjohns): Don't use the stateTokenCiper for encrypting the apiKey in the db - Use a
-      // different key, and store the IV alongside the encrypted value.
-      const cipher = await this.createCipher();
+      // re-encrypt the API key, using a per-user IV
+      slackUserData.apiKeyIV = crypto.randomBytes(API_KEY_IV_LENGTH);
+      const cipher = await this.createUserAPIKeyCipher(slackUserData.apiKeyIV);
       slackUserData.apiKey = cipher.update(stateToken.apiKey, 'utf8', 'base64') + cipher.final('base64');
 
     } // else the installer did NOT provide an API key, and will therefore remain
