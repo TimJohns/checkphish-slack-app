@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import {JWT} from "google-auth-library";
 import { Datastore } from "@google-cloud/datastore";
 import crypto from "crypto";
-import axios from "axios";
+import defaultAxios, { AxiosStatic } from "axios";
 import { SectionBlock } from "@slack/types";
 import { SlackUserModel } from "./models/slackUserModel";
 
@@ -16,6 +16,7 @@ export type PubSubControllerParams = {
   userAPIKeyCipherKey: string,
   audience: string,
   defaultCheckPhishAPIKey: string,
+  axios?: AxiosStatic
 };
 
 export function createPubSubController(params: PubSubControllerParams) {
@@ -29,12 +30,19 @@ type GetCheckPhishAPIParams = {
   team_id: string;
 }
 
+type Job = {
+  apiKey: string,
+  jobID: string,
+  insights: boolean
+};
+
 class PubSubControllerImpl implements PubSubController {
   private authClient: JWT;
   private audience: string;
   private datastore: Datastore;
   private userAPIKeyCipherKey: string;
   private defaultCheckPhishAPIKey: string;
+  private axios: AxiosStatic;
 
   constructor(
     params: PubSubControllerParams,
@@ -44,6 +52,7 @@ class PubSubControllerImpl implements PubSubController {
       this.defaultCheckPhishAPIKey = params.defaultCheckPhishAPIKey;
       this.userAPIKeyCipherKey = params.userAPIKeyCipherKey;
       this.audience = params.audience;
+      this.axios = params.axios || defaultAxios;
       this.authClient = authClient;
       this.datastore = datastore;
   };
@@ -97,6 +106,7 @@ class PubSubControllerImpl implements PubSubController {
 
     const authClient = this.authClient;
     const audience = this.audience;
+    const axios = this.axios;
 
     // Get the Cloud Pub/Sub-generated JWT in the "Authorization" header.
     const bearer = req.header('Authorization');
@@ -183,85 +193,79 @@ class PubSubControllerImpl implements PubSubController {
       console.log('Returning 200');
       res.sendStatus(200);
     }
+
+    // TODO(tjohns): Only poll a certain number or times, which, when combined with the
+    // POLL_INTERVAL_MS and some overhead, should not exceed the PubSub acknowledgement deadline
+    async function pollStatus(job: Job, responseUrl: string) {
+      // TODO(tjohns): Handle errors
+      // TODO(tjohns): parameterize URL
+      const statusResponse = await axios(
+        {
+        method: 'post',
+        url: 'https://developers.checkphish.ai/api/neo/scan/status',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        data: job
+      });
+
+      console.log(JSON.stringify({statusResponse: statusResponse.data}));
+
+      if (statusResponse.data.status == 'DONE') {
+
+        const block: SectionBlock = {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            verbatim: true,
+            text: `Scanned ${statusResponse.data.url}\ndisposition: *${statusResponse.data.disposition}*\n\n<${statusResponse.data.insights}|Click here for insights>`
+          },
+        };
+
+        if (statusResponse.data.resolved) {
+          block.accessory =  {
+            "type": "image",
+            "image_url": `${statusResponse.data.screenshot_path}`,
+            "alt_text": "Screenshot thumbnail"
+          }
+        }
+
+        const responsePayload = {
+          response_type: 'ephemeral',
+          text: `Scanned ${statusResponse.data.url}`,
+          blocks: [
+            block
+          ]
+        };
+
+        console.log(JSON.stringify({responsePayload}));
+
+        // TODO(tjohns): Handle errors
+        const messageResponse = await axios(
+          {
+          method: 'post',
+          url: responseUrl,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          data: responsePayload
+        });
+
+        console.log(JSON.stringify({messageResponse: messageResponse.data}));
+
+      } else if (statusResponse.data.status == 'PENDING') {
+        return new Promise((resolve, reject) => {
+          // TODO(tjohns) Redact API key from this log message
+          console.log(JSON.stringify({messageText: 'Polling', job}));
+          setTimeout(() => {
+            pollStatus(job, responseUrl)
+            .then(resolve)
+            .catch(reject);
+          }, POLL_INTERVAL_MS);
+        })
+      } else {
+        throw Error(`Unexpected status from CheckPhish API: ${statusResponse.data.status}`);
+      }
+    };
   }
 }
-
-type Job = {
-  apiKey: string,
-  jobID: string,
-  insights: boolean
-};
-
-// TODO(tjohns): Only poll a certain number or times, which, when combined with the
-// POLL_INTERVAL_MS and some overhead, should not exceed the PubSub acknowledgement deadline
-async function pollStatus(job: Job, responseUrl: string) {
-  // TODO(tjohns): Handle errors
-  // TODO(tjohns): parameterize URL
-  const statusResponse = await axios(
-    {
-    method: 'post',
-    url: 'https://developers.checkphish.ai/api/neo/scan/status',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    data: job
-  });
-
-  console.log(JSON.stringify({statusResponse: statusResponse.data}));
-
-  if (statusResponse.data.status == 'DONE') {
-
-    const block: SectionBlock = {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        verbatim: true,
-        text: `Scanned ${statusResponse.data.url}\ndisposition: *${statusResponse.data.disposition}*\n\n<${statusResponse.data.insights}|Click here for insights>`
-      },
-    };
-
-    if (statusResponse.data.resolved) {
-      block.accessory =  {
-        "type": "image",
-        "image_url": `${statusResponse.data.screenshot_path}`,
-        "alt_text": "Screenshot thumbnail"
-      }
-    }
-
-    const responsePayload = {
-      response_type: 'ephemeral',
-      text: `Scanned ${statusResponse.data.url}`,
-      blocks: [
-        block
-      ]
-    };
-
-    console.log(JSON.stringify({responsePayload}));
-
-    // TODO(tjohns): Handle errors
-    const messageResponse = await axios(
-      {
-      method: 'post',
-      url: responseUrl,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      data: responsePayload
-    });
-
-    console.log(JSON.stringify({messageResponse: messageResponse.data}));
-
-  } else if (statusResponse.data.status == 'PENDING') {
-    return new Promise((resolve, reject) => {
-      // TODO(tjohns) Redact API key from this log message
-      console.log(JSON.stringify({messageText: 'Polling', job}));
-      setTimeout(() => {
-        pollStatus(job, responseUrl)
-        .then(resolve)
-        .catch(reject);
-      }, POLL_INTERVAL_MS);
-    })
-  } else {
-    throw Error(`Unexpected status from CheckPhish API: ${statusResponse.data.status}`);
-  }
-};

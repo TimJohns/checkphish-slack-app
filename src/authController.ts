@@ -1,4 +1,4 @@
-import axios from "axios";
+import defaultAxios, { AxiosStatic } from "axios";
 import qs from "qs";
 import crypto from "crypto";
 import { Request, Response } from "express";
@@ -20,7 +20,8 @@ export type AuthControllerParams = {
   slackClientSecret: string,
   stateTokenCipherKey: string,
   stateTokenCipherIV: string,
-  userAPIKeyCipherKey: string
+  userAPIKeyCipherKey: string,
+  axios?: AxiosStatic
 };
 
 export function createAuthController(params: AuthControllerParams) {
@@ -39,6 +40,7 @@ class AuthControllerImpl implements AuthController {
   private stateTokenCipherIV: string;
   private userAPIKeyCipherKey: string;
   private datastore: Datastore;
+  private axios: AxiosStatic;
 
   constructor(
     params: AuthControllerParams,
@@ -49,6 +51,7 @@ class AuthControllerImpl implements AuthController {
       this.stateTokenCipherKey = params.stateTokenCipherKey;
       this.userAPIKeyCipherKey = params.userAPIKeyCipherKey;
       this.stateTokenCipherIV = params.stateTokenCipherIV;
+      this.axios = params.axios || defaultAxios;
       this.datastore = datastore;
   };
 
@@ -116,6 +119,7 @@ class AuthControllerImpl implements AuthController {
   // TODO(tjohns): Figure out how to specify query parameter allowed values w/TypeScript
   async handleGETAuth(req: Request, res: Response) {
     const datastore = this.datastore;
+    const axios = this.axios;
 
     if (req.query.error) {
       console.warn(`Auth failed: ${req.query.error}`);
