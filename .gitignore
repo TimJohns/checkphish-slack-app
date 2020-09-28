@@ -104,4 +104,4 @@ dist
 .tern-port
 
 #app.yaml
-app.yaml
+app.*.yaml
