@@ -1,4 +1,4 @@
-import defaultAxios, { AxiosStatic } from "axios";
+import defaultAxios, { AxiosInstance } from "axios";
 import qs from "qs";
 import crypto from "crypto";
 import { Request, Response } from "express";
@@ -21,7 +21,7 @@ export type AuthControllerParams = {
   stateTokenCipherKey: string,
   stateTokenCipherIV: string,
   userAPIKeyCipherKey: string,
-  axios?: AxiosStatic
+  axios?: AxiosInstance
 };
 
 export function createAuthController(params: AuthControllerParams) {
@@ -40,7 +40,7 @@ class AuthControllerImpl implements AuthController {
   private stateTokenCipherIV: string;
   private userAPIKeyCipherKey: string;
   private datastore: Datastore;
-  private axios: AxiosStatic;
+  private axios: AxiosInstance;
 
   constructor(
     params: AuthControllerParams,

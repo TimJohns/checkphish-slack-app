@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import {JWT} from "google-auth-library";
 import { Datastore } from "@google-cloud/datastore";
 import crypto from "crypto";
-import defaultAxios, { AxiosStatic } from "axios";
+import defaultAxios, { AxiosInstance } from "axios";
 import { SectionBlock } from "@slack/types";
 import { SlackUserModel } from "./models/slackUserModel";
 
@@ -16,7 +16,7 @@ export type PubSubControllerParams = {
   userAPIKeyCipherKey: string,
   audience: string,
   defaultCheckPhishAPIKey: string,
-  axios?: AxiosStatic
+  axios?: AxiosInstance
 };
 
 export function createPubSubController(params: PubSubControllerParams) {
@@ -42,7 +42,7 @@ class PubSubControllerImpl implements PubSubController {
   private datastore: Datastore;
   private userAPIKeyCipherKey: string;
   private defaultCheckPhishAPIKey: string;
-  private axios: AxiosStatic;
+  private axios: AxiosInstance;
 
   constructor(
     params: PubSubControllerParams,
