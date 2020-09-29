@@ -13,7 +13,7 @@ export interface PubSubController {
 };
 
 export type PubSubControllerParams = {
-  userAPIKeyCipherKey: string,
+  userAPIKeyCipherKey: Buffer,
   audience: string,
   defaultCheckPhishAPIKey: string,
   axios?: AxiosInstance
@@ -40,7 +40,7 @@ class PubSubControllerImpl implements PubSubController {
   private authClient: JWT;
   private audience: string;
   private datastore: Datastore;
-  private userAPIKeyCipherKey: string;
+  private userAPIKeyCipherKey: Buffer;
   private defaultCheckPhishAPIKey: string;
   private axios: AxiosInstance;
 

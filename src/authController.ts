@@ -18,9 +18,9 @@ export interface AuthController {
 export type AuthControllerParams = {
   slackClientId: string,
   slackClientSecret: string,
-  stateTokenCipherKey: string,
-  stateTokenCipherIV: string,
-  userAPIKeyCipherKey: string,
+  stateTokenCipherKey: Buffer,
+  stateTokenCipherIV: Buffer,
+  userAPIKeyCipherKey: Buffer,
   axios?: AxiosInstance
 };
 
@@ -36,9 +36,9 @@ type StateToken = {
 class AuthControllerImpl implements AuthController {
   private slackClientId: string;
   private slackClientSecret: string;
-  private stateTokenCipherKey: string;
-  private stateTokenCipherIV: string;
-  private userAPIKeyCipherKey: string;
+  private stateTokenCipherKey: Buffer;
+  private stateTokenCipherIV: Buffer;
+  private userAPIKeyCipherKey: Buffer;
   private datastore: Datastore;
   private axios: AxiosInstance;
 

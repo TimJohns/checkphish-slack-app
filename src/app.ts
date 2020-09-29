@@ -170,13 +170,13 @@ async function init() {
 
   const app = express();
   const secrets = createSecretsCache();
-  const userAPIKeyCipherKey = await secrets.getSecret('user_api_key_cipher_key');
+  const userAPIKeyCipherKey = Buffer.from(await secrets.getSecret('user_api_key_cipher_key'), 'base64');
 
   const authController = createAuthController({
     slackClientId: process.env.SLACK_CLIENT_ID,
     slackClientSecret: await secrets.getSecret('slack_client_secret'),
-    stateTokenCipherKey: await secrets.getSecret('state_token_cipher_key'),
-    stateTokenCipherIV: process.env.STATE_TOKEN_CIPHER_IV,
+    stateTokenCipherKey: Buffer.from(await secrets.getSecret('state_token_cipher_key'), 'base64'),
+    stateTokenCipherIV: Buffer.from(process.env.STATE_TOKEN_CIPHER_IV, 'base64'),
     userAPIKeyCipherKey
   });
   const signingSecret = await secrets.getSecret('slack_signing_secret');
