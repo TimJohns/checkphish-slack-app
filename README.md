@@ -48,7 +48,7 @@ TODO(tjohns): GIF/Video
 14. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
 15. Return to the Secret Manager parent page. TODO(tjohns): GIF or video
 16. Click 'CREATE SECRET' to create the third secret.
-17. Name the third secret 'checkphish_api_key', and copy the value from your CheckPhish API configuration.
+17. Name the third secret 'default_checkphish_api_key', and copy the value from your CheckPhish API configuration.
 18. Click 'Create Secret'. TODO(tjohns): Consider manually selecting the region.
 19. Redeploy your App Engine project with the updated YAML TODO(tjohns): Is there a convenient way to update the environment variable without redeploying?
 

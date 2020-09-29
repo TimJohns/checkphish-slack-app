@@ -103,8 +103,8 @@ class AuthControllerImpl implements AuthController {
     // use a CSRF token, I'll have to explain that, since it's standard practice - and
     // of course I might be wrong!)
 
-    // TODO(tjohns): Make a trial request with the API key to verify it's valid (at that one
-    // moment, anyway)
+    // TODO(tjohns): Allow the user to make a trial request with the API key to verify it's
+    // valid (at that one moment, anyway)
 
     const stateTokenStr = JSON.stringify(stateToken);
     // Encrypt the state token

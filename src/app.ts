@@ -18,6 +18,32 @@ declare var process : {
   }
 }
 
+
+declare global {
+  namespace Express {
+    interface Request {
+      slackSignatureVerified?: boolean
+    }
+  }
+  // Shouldn't Express do this?
+  //
+  // Per https://expressjs.com/en/guide/error-handling.html:
+  //
+  //    When an error is written, the following information is added to the response:
+  //
+  //    The res.statusCode is set from err.status (or err.statusCode). If this value is
+  //      outside the 4xx or 5xx range, it will be set to 500.
+  //    The res.statusMessage is set according to the status code.
+  //    The body will be the HTML of the status code message when in production
+  //      environment, otherwise will be err.stack.
+  //    Any headers specified in an err.headers object.
+  //
+  interface Error {
+    status?: number
+    statusCode?: number
+  }
+}
+
 class CheckPhishSlackApp {
   private app: any;
   private authController: AuthController;
@@ -51,7 +77,7 @@ class CheckPhishSlackApp {
       }
     }
 
-    app.use(bodyParser.urlencoded({ extended: true, verify: verifyURLEncodedBody}));
+    app.use(bodyParser.urlencoded({extended: true, verify: verifyURLEncodedBody}));
     app.use(bodyParser.json());
 
     app.set( "views", path.join( __dirname, "views" ) );
@@ -156,7 +182,7 @@ async function init() {
   const signingSecret = await secrets.getSecret('slack_signing_secret');
   const slackAppController = createSlackAppController(signingSecret);
   const pubSubController = createPubSubController({
-    defaultCheckPhishAPIKey: await secrets.getSecret('checkphish_api_key'),
+    defaultCheckPhishAPIKey: await secrets.getSecret('default_checkphish_api_key'),
     audience: process.env.PUBSUB_SUBSCRIPTION_AUDIENCE,
     userAPIKeyCipherKey
   });
