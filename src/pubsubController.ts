@@ -7,6 +7,7 @@ import { SectionBlock } from "@slack/types";
 import { SlackUserModel } from "./models/slackUserModel";
 
 const POLL_INTERVAL_MS = 1000;
+const PUBSUB_PUBLISHER_SERVICE_ACCT = process.env.PUBSUB_PUBLISHER_SERVICE_ACCT;
 
 export interface PubSubController {
   handlePOSTPubSubPush(req: Request, res: Response): Promise<void>;
@@ -126,19 +127,29 @@ class PubSubControllerImpl implements PubSubController {
     }
 
     try {
-      // TODO(tjohns): Remove these two log messages
-      console.log({idToken});
-      console.log({audience});
 
       const ticket = await authClient.verifyIdToken({
         idToken,
         audience
       });
 
+      // I'm not sure the following check is strictly necessary.
+      //
+      // Per https://cloud.google.com/pubsub/docs/push#claims,
+      //    "Pub/Sub requires that the user or service account used to associate a
+      //     service account identity with a push subscription have the Service Account
+      //     User role (roles/iam.serviceAccountUser) for the project or the service account."
+      //
+      // This check just makes it super-explicit that the JWT is from the INTENDED service account.
+      // One downside is that if Google ever changes the email of our default App Engine service
+      // account, we'll break until we sort that out.
+      //
       const claim = ticket.getPayload();
-
-      // TODO(tjohns): Remove this log message
-      console.log(JSON.stringify({claim}));
+      if (claim.email != PUBSUB_PUBLISHER_SERVICE_ACCT) {
+        const error = Error(`PubSub push handler was called by an unexpected service account: ${claim.email}`);
+        console.error(error);
+        throw error;
+      }
 
     } catch(error) {
       console.error('Incorrect credentials. Forbidden.');
