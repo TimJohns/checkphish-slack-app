@@ -52,37 +52,68 @@ class SlackAppControllerImpl implements SlackAppController {
       throw error;
     }
 
-    const url = (req.body.text || "");
-    if (url.length < 1) {
-      console.log('Received slash command with no parameters.');
-      // ACK it for Slack w/200, since this isn't a REST/API error, it's a user/application-level error
-      res.status(200).send('Missing URL.');
-      return;
+    async function defaultScanURLCommand() {
+
+      const url = req.body.text;
+
+      const message = {
+        url,
+        user_id: req.body.user_id,
+        team_id: req.body.team_id,
+        response_url: req.body.response_url
+      };
+
+      const dataBuffer = Buffer.from(JSON.stringify(message));
+      await pubSubClient.topic('scan').publish(dataBuffer);
+      res.status(200).json({
+        response_type: 'ephemeral',
+        text: `Scanning ${url}...`,
+        blocks: [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "verbatim": true,
+              "text": `Scanning ${url}...`
+            }
+          }
+        ]
+      });
     }
 
-    const message = {
-      url,
-      user_id: req.body.user_id,
-      team_id: req.body.team_id,
-      response_url: req.body.response_url
-    };
+    async function helpCommand(hint?: string) {
+      let text = `Typing \`/checkphish [url to check]\` will submit the URL to <https://checkphish.ai/?utm_source=slack_plugin&utm_medium=slack&utm_campaign=tim_johns|CheckPhish.ai> to scan for potential phishing and fraudulent website detection, and post the results to the same channel.`;
+      if (hint) {
+        text = '*' + hint + '*\n\n' + text;
+      }
 
-    const dataBuffer = Buffer.from(JSON.stringify(message));
-    await pubSubClient.topic('scan').publish(dataBuffer);
-    res.status(200).json({
-      response_type: 'ephemeral',
-      text: `Scanning ${url}...`,
-      blocks: [
-        {
-          "type": "section",
-          "text": {
-            "type": "mrkdwn",
-            "verbatim": true,
-            "text": `Scanning ${url}...`
+      res.status(200).json({
+        response_type: 'ephemeral',
+        text: hint || `Typing /checkphish [url to check] will submit the URL to CheckPhish.ai to scan for potential phishing and fraudulent website detection, and post the results to the same channel.`,
+        blocks: [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              text
+            }
           }
-        }
-      ]
-    });
+        ]
+      });
+    }
+
+    const command = (req.body.text || "")
+      .trim()
+      .toLowerCase();
+
+    switch (command) {
+      case 'help':
+        return helpCommand();
+      case '':
+        return helpCommand('Missing url to check.')
+      default:
+        return defaultScanURLCommand();
+    }
   }
 }
 

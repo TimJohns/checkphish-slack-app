@@ -65,7 +65,7 @@ TODO(tjohns): GIF/Video
 17. Add the string and click 'Create Secret'.
 18. Redeploy your App Engine project with the updated YAML.
 
-### Configure the PubSub subscription
-1. TODO(tjohns): Set up the Subscription
+### Configure PubSub
+1. TODO(tjohns): Set up the 'scan' Topic and Subscription
 
 
