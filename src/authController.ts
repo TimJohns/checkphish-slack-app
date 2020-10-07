@@ -4,8 +4,11 @@ import crypto from "crypto";
 import { Request, Response } from "express";
 import { Datastore } from "@google-cloud/datastore";
 import { SlackUserData, SlackUserModel } from "./models/slackUserModel";
+import { CSRFTokenData, CSRFTokenModel } from "./models/csrfTokenModel";
 
 const API_KEY_IV_LENGTH = 16;
+const CSRF_TOKEN_LENGTH = 16;
+const CSRF_TOKEN_LIFETIME_MS = 60 * 60 * 1000;
 
 export interface AuthController {
   handleGETInstall(req: Request, res: Response): Promise<void>;
@@ -30,6 +33,7 @@ export function createAuthController(params: AuthControllerParams) {
 };
 
 type StateToken = {
+  csrfToken: string,
   apiKey?: string
 };
 
@@ -81,27 +85,87 @@ class AuthControllerImpl implements AuthController {
     return crypto.createCipheriv(algorithm, key, iv);
   };
 
+  private async generateCSRFToken(): Promise<string> {
+    const datastore = this.datastore;
+    const csrfTokenHexStr = crypto.randomBytes(CSRF_TOKEN_LENGTH).toString('hex');
+
+    const csrfTokenData: CSRFTokenData = {
+      timestamp: Date.now()
+    };
+
+    const csrfToken = new CSRFTokenModel({
+      csrfTokenHexStr,
+      csrfTokenData
+    });
+
+    // Save the csrf token info (including the timestamp)
+    await datastore.save({
+      key: datastore.key(csrfToken.getKeyPath()),
+      data: csrfToken.getData()
+    });
+
+    return csrfTokenHexStr;
+  }
+
+  private async validateCSRFToken(csrfTokenHexStr: string) {
+    const datastore = this.datastore;
+
+    if (!csrfTokenHexStr
+      || !csrfTokenHexStr.length) {
+      console.warn(`No CSRF token.`);
+      const error = new Error('CSRF token not found.');
+      error.statusCode = 401;
+      throw error;
+    }
+
+
+    const csrfToken = new CSRFTokenModel({csrfTokenHexStr});
+    const csrfTokenKey = datastore.key(csrfToken.getKeyPath());
+
+    const query = datastore
+      .createQuery()
+      .filter('__key__', csrfTokenKey)
+      .limit(1);
+
+    const [[csrfTokenData]] = await datastore.runQuery(query);
+
+    if (!csrfTokenData
+      || !csrfTokenData.timestamp) {
+      console.warn(`CSRF token ${csrfTokenHexStr} not found.`);
+      const error = new Error('CSRF token not found.');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const now = Date.now();
+    if (now - csrfTokenData.timestamp > CSRF_TOKEN_LIFETIME_MS) {
+      console.warn(`CSRF token ${csrfTokenHexStr} expired at ${csrfTokenData.timestamp}ms. Currently ${now}ms.`);
+      const error = new Error('CSRF token expired.');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    datastore.delete(csrfTokenKey);
+  }
+
   async handleGETInstall(req: Request, res: Response) {
-    // TODO(tjohns): Generate CSRF/OTP Session Token (nonce + timestamp + random)
-    res.render('install');
+    res.render('install', {csrfToken: await this.generateCSRFToken()});
   };
 
   async handlePOSTInstall(req: Request, res: Response) {
 
-    // TODO(tjohns): Remove this console log
-    console.log(JSON.stringify({body: req.body}));
+    // Verify CSRF token
+    await this.validateCSRFToken(req.body.csrftoken as string);
 
     let destUrl = `https://slack.com/oauth/v2/authorize?client_id=${this.slackClientId}&scope=commands&user_scope=`;
     const apiKey = (req.body.apiKey || '').trim()
-    const stateToken: StateToken = {};
+    const stateToken: StateToken = {
+      csrfToken: await this.generateCSRFToken()
+    };
+
     if (apiKey.length) {
       stateToken.apiKey = apiKey;
     }
-
-    // TODO(tjohns): Verify CSRF token (I'm not sure this is strictly necessary, since the
-    // apiKey is, in effect, a form of identity token, but I'm 100% certain if I DON'T
-    // use a CSRF token, I'll have to explain that, since it's standard practice - and
-    // of course I might be wrong!)
 
     // TODO(tjohns): Allow the user to make a trial request with the API key to verify it's
     // valid (at that one moment, anyway)
@@ -129,14 +193,13 @@ class AuthControllerImpl implements AuthController {
 
     const userPass = `${this.slackClientId}:${this.slackClientSecret}`;
     const basicCredentials = Buffer.from(userPass).toString('base64');
-    // TODO(tjohns): Verify something here (in addition to just saving off the API Key)
     const decipher = await this.createStateTokenDecipher();
     const stateTokenStr = decipher.update(req.query.state as string, 'base64', 'utf8') + decipher.final('utf8');
 
     const stateToken: StateToken = JSON.parse(stateTokenStr);
 
-    // TODO(tjohns): Remove this log statement
-    console.log(stateTokenStr);
+    // Validate the CSRF token in the state token
+    await this.validateCSRFToken(stateToken.csrfToken);
 
     const exchangeResponse = await axios(
       {
@@ -150,9 +213,6 @@ class AuthControllerImpl implements AuthController {
         code: req.query.code
       })
     });
-
-    // TODO(tjohns) Remove this log statement.
-    console.log(JSON.stringify({exchangeResponse: exchangeResponse.data}));
 
     const slackUserData: SlackUserData = {
       user: exchangeResponse.data.authed_user,

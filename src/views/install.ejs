@@ -23,6 +23,7 @@
           <input type="text" class="d-none" autocomplete="username" value="">
           <label for="apikey">CheckPhish API Key</label>
           <input type="password" autocomplete="current-password" class="form-control" name="apiKey" id="apikey" placeholder="Optional">
+          <input type="hidden" name="csrftoken" value="<%=csrfToken%>"/>
         </div>
         <button type="submit" class="btn btn-primary">Install</button>
       </form>

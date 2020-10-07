@@ -1,10 +1,6 @@
 import { PathType } from "@google-cloud/datastore";
+import { DatastoreModel } from "./datastoreModel";
 
-// TODO(tjohns): Move DatastoreModel to a different file
-export interface DatastoreModel {
-  getKeyPath(): PathType[];
-  getData(): any;
-};
 
 export type SlackUserData = {
   // TODO(tjohns): user is not really 'any', it's Slack's type. Use that type or create a bounded context

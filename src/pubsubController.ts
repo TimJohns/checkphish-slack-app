@@ -86,8 +86,9 @@ class PubSubControllerImpl implements PubSubController {
     const slackUser = new SlackUserModel({teamId, userId});
 
     const query = datastore
-      .createQuery('SlackUser') // TODO(tjohns): Do we need the 'kind', here, since it is also in the key filter?
-      .filter('__key__', datastore.key(slackUser.getKeyPath()));
+      .createQuery()
+      .filter('__key__', datastore.key(slackUser.getKeyPath()))
+      .limit(1);
 
     const [[slackUserData]] = await datastore.runQuery(query);
 
