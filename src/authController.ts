@@ -9,6 +9,7 @@ import { CSRFTokenData, CSRFTokenModel } from "./models/csrfTokenModel";
 const API_KEY_IV_LENGTH = 16;
 const CSRF_TOKEN_LENGTH = 16;
 const CSRF_TOKEN_LIFETIME_MS = 60 * 60 * 1000;
+const SLACK_SLASH_COMMAND = process.env.SLACK_SLASH_COMMAND;
 
 export interface AuthController {
   handleGETInstall(req: Request, res: Response): Promise<void>;
@@ -260,7 +261,10 @@ class AuthControllerImpl implements AuthController {
   };
 
   async handleGETAuthSuccess(req: Request, res: Response) {
-    res.render('authsuccess', {team: req.query.teamName || "Unknown Team"});
+    res.render('authsuccess', {
+      team: req.query.teamName || "Unknown Team",
+      slackSlashCommand: SLACK_SLASH_COMMAND
+    });
   };
 
   async handleGETAuthFailed(req: Request, res: Response) {

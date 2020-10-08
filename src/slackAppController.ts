@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { verifyRequestSignature } from "@slack/events-api";
 import { PubSub } from "@google-cloud/pubsub";
 
+const SLACK_SLASH_COMMAND = process.env.SLACK_SLASH_COMMAND;
+
 export interface SlackAppController {
   handlePOSTSlashCommand(req: Request, res: Response): Promise<void>;
 
@@ -82,14 +84,14 @@ class SlackAppControllerImpl implements SlackAppController {
     }
 
     async function helpCommand(hint?: string) {
-      let text = `Typing \`/checkphish [url to check]\` will submit the URL to <https://checkphish.ai/?utm_source=slack_plugin&utm_medium=slack&utm_campaign=tim_johns|CheckPhish.ai> to scan for potential phishing and fraudulent website detection, and post the results to the same channel.`;
+      let text = `Typing \`/${SLACK_SLASH_COMMAND} [url to check]\` will submit the URL to <https://checkphish.ai/?utm_source=slack_plugin&utm_medium=slack&utm_campaign=tim_johns|CheckPhish.ai> to scan for potential phishing and fraudulent website detection, and post the results to the same channel.`;
       if (hint) {
         text = '*' + hint + '*\n\n' + text;
       }
 
       res.status(200).json({
         response_type: 'ephemeral',
-        text: hint || `Typing /checkphish [url to check] will submit the URL to CheckPhish.ai to scan for potential phishing and fraudulent website detection, and post the results to the same channel.`,
+        text: hint || `Typing /${SLACK_SLASH_COMMAND} [url to check] will submit the URL to CheckPhish.ai to scan for potential phishing and fraudulent website detection, and post the results to the same channel.`,
         blocks: [
           {
             "type": "section",
