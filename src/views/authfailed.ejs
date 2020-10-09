@@ -2,15 +2,18 @@
 <html lang="en">
   <head>
     <%- include('partials/head') %>
-    <title>Auth failed</title>
+    <title>Community-Built Slack App for CheckPhish Installation Authorization Failed</title>
   </head>
   <body>
+    <%- include('partials/header') %>
+
     <div class="container">
       <h1>Unable to add CheckPhish Slack App</h1>
 
       <p>Sorry, we were unable to add the community-built CheckPhish Slack integration to the Slack workspace.</p>
       <p>Error: <%=error%></p>
     </div>
+    <%- include('partials/footer') %>
     <%- include ('partials/bodylast') %>
   </body>
 </html>

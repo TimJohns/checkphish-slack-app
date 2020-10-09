@@ -83,8 +83,6 @@ class CheckPhishSlackApp {
     app.set( "views", path.join( __dirname, "views" ) );
     app.set('view engine', 'ejs');
 
-    app.use( express.static( path.join( __dirname, "public" ) ) );
-
     app.get('/_ah/warmup', (req: Request, res: Response) => {
       // We don't actually need to DO anything here, currently, but we must handle this request
       // in order for GCP App Engine to pay attention to our min_instances in app.yaml.

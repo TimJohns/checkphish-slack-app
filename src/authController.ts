@@ -150,7 +150,10 @@ class AuthControllerImpl implements AuthController {
   }
 
   async handleGETInstall(req: Request, res: Response) {
-    res.render('install', {csrfToken: await this.generateCSRFToken()});
+    res.render('install', {
+      csrfToken: await this.generateCSRFToken(),
+      slackSlashCommand: SLACK_SLASH_COMMAND
+    });
   };
 
   async handlePOSTInstall(req: Request, res: Response) {

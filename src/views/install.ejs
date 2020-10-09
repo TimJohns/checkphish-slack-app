@@ -2,32 +2,67 @@
 <html lang="en">
   <head>
     <%- include('partials/head') %>
-    <title>CheckPhish Slack App Install</title>
+    <title>Community-Built Slack App for CheckPhish Installation</title>
+
+    <meta name="description" content="Installation page for the Community-Built Slack App for CheckPhish, which is a free Slack slash command for detecting phishing, fraudulent, and other categories of sites in real time.">
+
   </head>
   <body>
-    <div class="container">
-      <h1>Installation</h1>
+    <%- include('partials/header') %>
 
-      <p>If you provide an optional CheckPhish API key, the summaries of API usage will be shown in the associated dashboard, and requests made will be limited by your own quota rather than a shared quota.</p>
-      <p>If you don't provide a key, the Slack App will function, but the quota is shared among others in the community, and you won't be able to see usage stats in your dashboard.</p>
-      <p>If you change your mind later, you can reinstall the CheckPhish Slack App.</p>
+    <main role="main">
 
-      <form method="post">
-        <div class="form-group">
-          <!-- This username text input is here only to remove a Chrome warning regarding assistive
-          technology. We don't WANT a user name, but since we used "current-password" for the api key,
-          Chrome thinks we have a corresponding user name (...and should include the context for screen
-          readers). But we don't, yet, since we have no idea how the user got here. For our similar form
-          for our 'config' Slack slash command, where we DO know who the user is, we should include
-          a user name or similar information, hidden, so that screen readers CAN provide that context. -->
-          <input type="text" class="d-none" autocomplete="username" value="">
-          <label for="apikey">CheckPhish API Key</label>
-          <input type="password" autocomplete="current-password" class="form-control" name="apiKey" id="apikey" placeholder="Optional">
-          <input type="hidden" name="csrftoken" value="<%=csrfToken%>"/>
+      <section class="jumbotron text-center">
+        <div class="container">
+          <h1 class="jumbotron-heading">Integrate CheckPhish with Slack</h1>
+          <p class="lead text-muted">Free Slack slash command to detect phishing and fraudulent sites.</p>
+          <form method="post">
+            <div class="form-group">
+              <!-- This username text input is here only to remove a Chrome warning regarding assistive
+              technology. We don't WANT a user name, but since we used "current-password" for the api key,
+              Chrome thinks we have a corresponding user name (...and should include the context for screen
+              readers). But we don't, yet, since we have no idea how the user got here. For our similar form
+              for our 'config' Slack slash command, where we DO know who the user is, we should include
+              a user name or similar information, hidden, so that screen readers CAN provide that context. -->
+              <input type="text" class="d-none" autocomplete="username" value="">
+              <label for="apikey">Optional CheckPhish API Key*</label>
+              <input type="password" autocomplete="current-password" class="form-control" name="apiKey" id="apikey" placeholder="Optional">
+              <input type="hidden" name="csrftoken" value="<%=csrfToken%>"/>
+            </div>
+            <button type="submit" class="btn btn-primary my-2">Add to Slack</button>
+          </form>
         </div>
-        <button type="submit" class="btn btn-primary">Install</button>
-      </form>
-    </div>
-    <%- include ('partials/bodylast') %>
+      </section>
+
+      <div class="py-5 bg-light">
+        <div class="container">
+          <p>After installation, to submit a website to Bolster's powerful deep learning CheckPhish scanner for real-time phishing and fraudulent website detection, in any channel in your Slack workspace enter:</p>
+          <p>
+            <code>
+              /<%=slackSlashCommand%> [url to check]
+            </code>
+          </p>
+          <p>This slash command uses the CheckPhish API to scan for and detect the following categories in real time:</p>
+          <ul>
+            <li>Zero-Day Phishing</li>
+            <li>Tech Support Scams</li>
+            <li>Gift Card Scams</li>
+            <li>Survey Scams</li>
+            <li>Adult Websites</li>
+            <li>Drug Pharmacy (Drug Spam) Websites</li>
+            <li>Illegal/Rogue Streaming Sites</li>
+            <li>Gambling Websites</li>
+            <li>Hacked Websites</li>
+            <li>Cryptojacking / Cryptomining</li>
+          </ul>
+          <p>For more information on CheckPhish, please visit <a href="https://checkphish.ai/?utm_source=slack_plugin&utm_medium=slack&utm_campaign=tim_johns">CheckPhish.ai</a></p>
+          <p class="text-muted">
+            <p>*If you have your own CheckPhish account, you can provide an optional CheckPhish API key, and the summaries of API usage will be shown in the associated dashboard. In addition, requests that you make with this slash command will be limited only by your own quota rather than a shared quota. If you don't provide a key, the Slack App will function, but the quota is shared among others in the community, and you won't be able to see usage stats in your dashboard. If you change your mind later either way, you can reinstall the CheckPhish Slack App.</p>
+          </p>
+        </div>
+      </div>
+    </main>
+    <%- include('partials/footer') %>
+    <%- include('partials/bodylast') %>
   </body>
 </html>

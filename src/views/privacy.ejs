@@ -2,9 +2,10 @@
 <html lang="en">
   <head>
     <%- include('partials/head') %>
-    <title>Privacy Policy</title>
+    <title>Community-Built Slack App for CheckPhish Privacy Policy</title>
   </head>
   <body>
+    <%- include('partials/header') %>
     <div class="container">
       <h1>Privacy Policy</h1>
       <p>Last revised 07OCT2020</p>
@@ -19,6 +20,7 @@
       <p>We currently use Google for hosting this service, which connects Slack to Bolster's CheckPhish API, so if you're interested in using this integration, you may wish to also review <a href="https://slack.com/privacy-policy">Slack's Privacy Policy</a>,
       <a href="https://checkphish.ai/privacy-policy/">CheckPhish's Privacy Policy</a>, and <a href="https://cloud.google.com/logging/quotas#logs_retention_periods">Google's Log Retention configuration</a>.</p>
     </div>
+    <%- include('partials/footer') %>
     <%- include ('partials/bodylast') %>
   </body>
 </html>
