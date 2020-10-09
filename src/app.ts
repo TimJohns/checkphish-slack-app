@@ -89,6 +89,10 @@ class CheckPhishSlackApp {
       res.sendStatus(200);
     });
 
+    app.get('/', async (req: Request, res: Response) => {
+      res.redirect('/slackappinstall');
+    });
+
     app.get('/slackappprivacy', async (req: Request, res: Response, next: NextFunction) => {
       try {
         res.render('privacy');
