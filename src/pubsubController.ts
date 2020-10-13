@@ -278,15 +278,37 @@ class PubSubControllerImpl implements PubSubController {
 
       } else if (statusResponse.data.status == 'DONE') {
 
+        // TODO(tjohns): Ask Bolster team about listing these out in the API docs
+
+        // default to whatever CheckPhish returned, verbatim
+        let disposition = `*${statusResponse.data.disposition}*`;
+        switch (statusResponse.data.disposition) {
+          case 'clean':
+            if (statusResponse.data.resolved) {
+              disposition = '*clean* :white_check_mark:';
+            } else {
+              disposition = 'unable to resolve at this time, please try again later.'
+            }
+            break;
+          case 'phish':
+            disposition = '*phish* :no_entry:'
+            break;
+          case 'suspicious':
+            disposition = '*suspicious* :face_with_raised_eyebrow:';
+            break;
+        }
+
+
         const block: SectionBlock = {
           type: "section",
           text: {
             type: "mrkdwn",
             verbatim: true,
-            text: `Scanned ${statusResponse.data.url}\ndisposition: *${statusResponse.data.disposition}*\n\n<${statusResponse.data.insights}|Click here for insights>`
+            text: `Scanned ${statusResponse.data.url}\ndisposition: ${disposition}\n\n<${statusResponse.data.insights}|Click here for insights>`
           },
         };
 
+        // TODO(tjohns): Ask Bolster team about formal semantic meaning of 'resolved' for the API docs
         if (statusResponse.data.resolved) {
           block.accessory =  {
             "type": "image",
