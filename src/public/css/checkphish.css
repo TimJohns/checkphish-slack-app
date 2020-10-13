@@ -37,3 +37,16 @@ footer p {
 }
 
 .box-shadow { box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05); }
+
+.advanced-options-heading .advanced-options-toggle:after {
+  /* symbol for "opening" link */
+  font-family: 'FontAwesome';
+  content: "\f106";
+}
+.advanced-options-heading .advanced-options-toggle.collapsed:after {
+  /* symbol for "closing" link */
+  font-family: 'FontAwesome';
+  content: "\f107";
+}
+
+
