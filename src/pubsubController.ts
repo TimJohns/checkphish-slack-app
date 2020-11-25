@@ -5,18 +5,13 @@ import crypto from "crypto";
 import defaultAxios, { AxiosInstance } from "axios";
 import { SectionBlock } from "@slack/types";
 import { SlackUserModel } from "./models/slackUserModel";
+import { CheckPhish } from "@timjohns/checkphish";
 
 const POLL_INTERVAL_MS = 1000;
 const CHECKPHISH_API_POLL_RETRIES = 30;
 const PUBSUB_PUBLISHER_SERVICE_ACCT = process.env.PUBSUB_PUBLISHER_SERVICE_ACCT;
-const CHECKPHISH_API_HOST = process.env.CHECKPHISH_API_HOST;
 const USER_AGENT = `${process.env.SLACK_SLASH_COMMAND}-slackapp/0.99`;
 
-// By coincidence these headers are the same, but to DRY it up is more confusing IMO
-const CHECKPHISH_API_HEADERS = {
-  'Content-Type': 'application/json',
-  'User-Agent': USER_AGENT
-};
 const SLACK_API_HEADERS = {
   'Content-Type': 'application/json',
   'User-Agent': USER_AGENT
@@ -43,12 +38,6 @@ type GetCheckPhishAPIParams = {
   user_id: string;
   team_id: string;
 }
-
-type Job = {
-  apiKey: string,
-  jobID: string,
-  insights: boolean
-};
 
 class PubSubControllerImpl implements PubSubController {
   private authClient: JWT;
@@ -172,119 +161,67 @@ class PubSubControllerImpl implements PubSubController {
     }
 
 
+
+    console.log(JSON.stringify({body: req.body}));
+
+    const slackPayload = JSON.parse(Buffer.from(req.body.message.data, 'base64').toString('utf-8'));
+
+    console.log(JSON.stringify({slackPayload}));
+
     try {
-
-      console.log(JSON.stringify({body: req.body}));
-
-      const slackPayload = JSON.parse(Buffer.from(req.body.message.data, 'base64').toString('utf-8'));
-
-      console.log(JSON.stringify({slackPayload}));
-
       const apiKey = await this.getCheckPhishAPIKey({
         user_id: slackPayload.user_id,
         team_id: slackPayload.team_id
       });
 
-      const scanResponse = await axios(
-      {
-        method: 'post',
-        url: `${CHECKPHISH_API_HOST}/neo/scan`,
-        headers: CHECKPHISH_API_HEADERS,
-        data: {
-          apiKey,
-          urlInfo: {
-            url:  slackPayload.url
-            }
-          }
-      });
+      const checkphish = new CheckPhish(apiKey, {userAgent: USER_AGENT});
 
-      console.log(JSON.stringify({scanResponse: scanResponse.data}));
+      const scanResponse = await checkphish.scan(slackPayload.url);
 
-      if (scanResponse.data.errorMessage) {
-
-        const message = `Error scanning ${slackPayload.url}: ${scanResponse.data.errorMessage}`
-        console.log(JSON.stringify({message, scanResponse: scanResponse.data}));
-
-        const responsePayload = {
-          response_type: 'ephemeral',
-          text: message,
-        };
-
-        // TODO(tjohns): Handle errors - probably just log (an actual console.error), since
-        // this is itself in error handling code.
-        const messageResponse = await axios(
-          {
-          method: 'post',
-          url: slackPayload.response_url,
-          headers: SLACK_API_HEADERS,
-          data: responsePayload
-        });
-
-        console.log(JSON.stringify({messageResponse: messageResponse.data}));
-
-      } else {
-
-        const job = {
-          apiKey,
-          jobID: scanResponse.data.jobID as string,
-          insights: true
-        };
-
-        await pollStatus(job, slackPayload.response_url);
-
-      }
+      await pollStatus(checkphish, scanResponse.jobID, slackPayload.response_url);
 
     } catch(error) {
       console.error(`Error: ${error.message}`);
+
+      const responsePayload = {
+        response_type: 'ephemeral',
+        text: error.message,
+      };
+
+      // TODO(tjohns): Handle errors - probably just log (an actual console.error), since
+      // this is itself in error handling code.
+      const messageResponse = await axios(
+        {
+        method: 'post',
+        url: slackPayload.response_url,
+        headers: SLACK_API_HEADERS,
+        data: responsePayload
+      });
+
+      console.log(JSON.stringify({messageResponse: messageResponse.data}));
+
     } finally {
       res.sendStatus(200);
     }
 
     // TODO(tjohns): Only poll a certain number or times, which, when combined with the
     // POLL_INTERVAL_MS and some overhead, should not exceed the PubSub acknowledgement deadline
-    async function pollStatus(job: Job, responseUrl: string, retries = 0) {
+    async function pollStatus(checkphish: CheckPhish, jobID: string, responseUrl: string, retries = 0) {
 
-      const statusResponse = await axios(
-        {
-        method: 'post',
-        url: `${CHECKPHISH_API_HOST}/neo/scan/status`,
-        headers: CHECKPHISH_API_HEADERS,
-        data: job
-      });
+      const statusResponse = await checkphish.status(jobID, true);
 
-      console.log(JSON.stringify({statusResponse: statusResponse.data}));
+      // TODO(tjohns): Delete this console log
+      console.log(JSON.stringify({statusResponse}));
 
-      if (statusResponse.data.errorMessage) {
-
-        const message = 'Error while retrieving scan results. Please try again later.'
-        console.log(JSON.stringify({message, job}));
-
-        const responsePayload = {
-          response_type: 'ephemeral',
-          text: message,
-        };
-
-        // TODO(tjohns): Handle errors - probably just log (an actual console.error), since
-        // this is itself in error handling code.
-        const messageResponse = await axios(
-          {
-          method: 'post',
-          url: responseUrl,
-          headers: SLACK_API_HEADERS,
-          data: responsePayload
-        });
-
-        console.log(JSON.stringify({messageResponse: messageResponse.data}));
-
-      } else if (statusResponse.data.status == 'DONE') {
+      if (statusResponse.status == 'DONE') {
 
         // TODO(tjohns): Ask Bolster team about listing these out in the API docs
 
         // default to whatever CheckPhish returned, verbatim
-        let disposition = `*${statusResponse.data.disposition}*`;
-        switch (statusResponse.data.disposition) {
+        let disposition = `*${statusResponse.disposition}*`;
+        switch (statusResponse.disposition) {
           case 'clean':
-            if (statusResponse.data.resolved) {
+            if (statusResponse.resolved) {
               disposition = '*clean* :white_check_mark:';
             } else {
               disposition = 'unable to resolve at this time, please try again later.'
@@ -304,22 +241,22 @@ class PubSubControllerImpl implements PubSubController {
           text: {
             type: "mrkdwn",
             verbatim: true,
-            text: `Scanned ${statusResponse.data.url}\ndisposition: ${disposition}\n\n<${statusResponse.data.insights}|Click here for insights>`
+            text: `Scanned ${statusResponse.url}\ndisposition: ${disposition}\n\n<${statusResponse.insights}|Click here for insights>`
           },
         };
 
         // TODO(tjohns): Ask Bolster team about formal semantic meaning of 'resolved' for the API docs
-        if (statusResponse.data.resolved) {
+        if (statusResponse.resolved) {
           block.accessory =  {
             "type": "image",
-            "image_url": `${statusResponse.data.screenshot_path}`,
+            "image_url": `${statusResponse.screenshot_path}`,
             "alt_text": "Screenshot thumbnail"
           }
         }
 
         const responsePayload = {
           response_type: 'ephemeral',
-          text: `Scanned ${statusResponse.data.url}`,
+          text: `Scanned ${statusResponse.url}`,
           blocks: [
             block
           ]
@@ -338,30 +275,13 @@ class PubSubControllerImpl implements PubSubController {
 
         console.log(JSON.stringify({messageResponse: messageResponse.data}));
 
-      } else if (statusResponse.data.status == 'PENDING') {
+      } else if (statusResponse.status == 'PENDING') {
 
         if (retries > CHECKPHISH_API_POLL_RETRIES) {
 
-          const message = `Timeout scanning ${statusResponse.data.url}. Please try again later.`
-          console.warn(JSON.stringify({message, job}));
-
-          const responsePayload = {
-            response_type: 'ephemeral',
-            text: message,
-          };
-
-          // TODO(tjohns): Handle errors - probably just log (an actual console.error), since
-          // this is itself in error handling code.
-          const messageResponse = await axios(
-            {
-            method: 'post',
-            url: responseUrl,
-            headers: SLACK_API_HEADERS,
-            data: responsePayload
-          });
-
-          console.log(JSON.stringify({messageResponse: messageResponse.data}));
-
+          const message = `Timeout scanning ${statusResponse.url}. Please try again later.`
+          console.warn(JSON.stringify({message, jobID}));
+          throw new Error(message);
 
 
         } else {
@@ -369,16 +289,16 @@ class PubSubControllerImpl implements PubSubController {
           return new Promise((resolve, reject) => {
             retries++;
             // TODO(tjohns) Redact API key from this log message
-            console.log(JSON.stringify({messageText: 'Polling', job, retries}));
+            console.log(JSON.stringify({messageText: 'Polling', jobID, retries}));
             setTimeout(() => {
-              pollStatus(job, responseUrl, retries)
+              pollStatus(checkphish, jobID, responseUrl, retries)
               .then(resolve)
               .catch(reject);
             }, POLL_INTERVAL_MS);
           })
         }
       } else {
-        throw Error(`Unexpected status from CheckPhish API: ${statusResponse.data.status}`);
+        throw Error(`Unexpected status from CheckPhish API: ${statusResponse.status}`);
       }
     };
   }

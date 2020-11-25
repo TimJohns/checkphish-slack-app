@@ -41,6 +41,7 @@ class SlackAppControllerImpl implements SlackAppController {
       body
     });
 
+    console.log('Signature verified.');
   }
 
   async handlePOSTSlashCommand(req: Request, res: Response) {
